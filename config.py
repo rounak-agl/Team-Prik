@@ -43,6 +43,7 @@ def clickhouse_config() -> dict | None:
         "password": os.environ.get("CLICKHOUSE_PASSWORD", ""),
         "secure": os.environ.get("CLICKHOUSE_SECURE", "true").lower() == "true",
         "connect_timeout": int(os.environ.get("CLICKHOUSE_CONNECT_TIMEOUT", "8")),
+        "send_receive_timeout": int(os.environ.get("CLICKHOUSE_QUERY_TIMEOUT", "20")),
     }
 
 

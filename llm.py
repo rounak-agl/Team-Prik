@@ -19,11 +19,14 @@ def _get_client():
     _tried = True
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
+        print("[llm] GEMINI_API_KEY not set in environment/.env → LLM disabled")
         return None
     try:
         from google import genai
         _client = genai.Client(api_key=key)
-    except Exception:
+    except Exception as e:
+        print(f"[llm] client init failed ({type(e).__name__}: {e}) → "
+              f"is google-genai installed? (pip install google-genai)")
         _client = None
     return _client
 

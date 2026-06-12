@@ -31,7 +31,7 @@ class Blackboard:
 
     def log(self, agent: str, msg: str) -> None:
         self.trace.append((agent, msg))
-        print(f"   ├─ [{agent:<12}] {msg}")
+        print(f"   ├─ [{agent:<12}] {msg}", flush=True)
 
     def targets(self) -> list:
         return [ts for ts in self.trips.values() if ts.is_target]

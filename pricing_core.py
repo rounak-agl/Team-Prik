@@ -57,6 +57,18 @@ def tier_index(c: str) -> int:
     return norm.get(n, -1)
 
 
+def clamp_to_allowed(cls: str, allowed: list) -> str:
+    """Snap a classification to the trip's allowed tier set (per-trip the API
+    only permits some tiers). Picks the nearest allowed tier on the ladder."""
+    if not allowed or cls in allowed:
+        return cls
+    idx = {tier_index(a): a for a in allowed if tier_index(a) >= 0}
+    ci = tier_index(cls)
+    if ci < 0 or not idx:
+        return allowed[0]
+    return idx[min(idx, key=lambda i: abs(i - ci))]
+
+
 def move_tier(c: str, step: int) -> str:
     i = tier_index(c)
     if i < 0:
@@ -104,13 +116,11 @@ def propose(sig: Signals, base_fare: float, current_price: float, model_class: s
         net = (occ + lead + vel + max(dem, 0.0)) * factor + min(dem, 0.0)
         comp = {"occupancy": occ, "lead": lead, "demand": dem, "velocity": vel}
 
+    # Baseline (fallback only — the LLM Reasoner refines this). Adjustment is a
+    # nuanced value in [-CAP, +CAP]; beyond the cap, also step the tier.
     pct = round(net * 100)
-    if pct >= 0:
-        adjustment_pct = min(pct, ADJ_CAP)             # 0..cap
-        tier_step = 1 if pct > ADJ_CAP else 0           # need more than cap → tier up
-    else:
-        tier_step = -1                                  # discount → step tier down (API adj is ≥0)
-        adjustment_pct = 0
+    adjustment_pct = max(-ADJ_CAP, min(pct, ADJ_CAP))
+    tier_step = 1 if pct > ADJ_CAP else (-1 if pct < -ADJ_CAP else 0)
 
     new_class = move_tier(model_class, tier_step)
     if tier_index(new_class) == tier_index(model_class):
