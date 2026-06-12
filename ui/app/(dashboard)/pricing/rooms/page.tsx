@@ -27,8 +27,8 @@ interface PricingRoom {
 
 export default function PricingRoomsPage() {
   const router = useRouter();
-  const [source, setSource] = useState("");
-  const [destination, setDestination] = useState("");
+  const [source, setSource] = useState("Bangalore");
+  const [destination, setDestination] = useState("Tirupati");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [quickOpenError, setQuickOpenError] = useState<string | null>(null);

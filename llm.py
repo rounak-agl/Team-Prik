@@ -45,6 +45,7 @@ def complete(prompt: str, system: str | None = None,
             max_output_tokens=max_tokens,
             system_instruction=system,
             response_mime_type="application/json" if json_mode else None,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
         resp = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
         return (resp.text or "").strip()

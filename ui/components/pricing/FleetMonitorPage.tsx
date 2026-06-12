@@ -127,8 +127,8 @@ export function FleetMonitorPage() {
   });
 
   const [routeInput, setRouteInput] = useState("");
-  const [sourceInput, setSourceInput] = useState("");
-  const [destInput, setDestInput] = useState("");
+  const [sourceInput, setSourceInput] = useState("Bangalore");
+  const [destInput, setDestInput] = useState("Tirupati");
   const [svcSearch, setSvcSearch] = useState("");
   const [openRoomDialog, setOpenRoomDialog] = useState(false);
 
