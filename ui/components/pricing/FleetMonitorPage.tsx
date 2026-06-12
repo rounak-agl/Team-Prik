@@ -133,7 +133,8 @@ export function FleetMonitorPage() {
   const [openRoomDialog, setOpenRoomDialog] = useState(false);
 
   const { data, isLoading, error } = useFleetMonitor(filters);
-  const rows: FleetRow[] = data?.data ?? data ?? [];
+  const rows: FleetRow[] = data?.rows ?? data?.data ?? (Array.isArray(data) ? data : []);
+  const fleetSummary = data?.summary ?? null;
 
   /* client-side secondary filter on free-text fields */
   const filtered = useMemo(() => {
