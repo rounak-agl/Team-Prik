@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { SessionData, sessionOptions } from "@/lib/server/session";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (
     request.nextUrl.pathname.startsWith("/pricing") &&
     !request.nextUrl.pathname.startsWith("/pricing/login")
