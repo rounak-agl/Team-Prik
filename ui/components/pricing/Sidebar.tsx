@@ -3,6 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+
+function usePersistedState(key: string, defaultValue: boolean) {
+  const [state, setState] = useState<boolean>(() => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? JSON.parse(stored) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  });
+
+  function setValue(value: boolean) {
+    setState(value);
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }
+
+  return [state, setValue] as const;
+}
 import {
   LayoutDashboard,
   MessageSquare,
@@ -29,7 +48,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistedState("sidebar-collapsed", false);
 
   return (
     <aside

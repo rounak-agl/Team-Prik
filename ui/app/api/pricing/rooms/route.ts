@@ -10,12 +10,14 @@ export async function GET(request: NextRequest) {
     const rooms = await prisma.pricingChatRoom.findMany({
       where: {
         ...(date ? { journeyDate: date } : {}),
-        ...(route ? { routeId: route } : {}),
+        ...(route ? { routeId: { contains: route } } : {}),
       },
       orderBy: { updatedAt: "desc" },
+      take: 50,
+      include: { _count: { select: { messages: true } } },
     });
 
-    return NextResponse.json({ rooms });
+    return NextResponse.json({ rooms: rooms.map(r => ({ ...r, messageCount: r._count.messages })) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
