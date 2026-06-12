@@ -441,13 +441,13 @@ export default function PricingRoomsPage() {
                           {trip.redbusrating != null && trip.redbusrating > 0 && (
                             <span className="flex items-center gap-0.5">
                               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {(trip.redbusrating as number).toFixed(1)} Redbus
+                              {Number(trip.redbusrating).toFixed(1)} Redbus
                             </span>
                           )}
                           {trip.abhibusrating != null && trip.abhibusrating > 0 && (
                             <span className="flex items-center gap-0.5">
                               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {(trip.abhibusrating as number).toFixed(1)} Abhibus
+                              {Number(trip.abhibusrating).toFixed(1)} Abhibus
                             </span>
                           )}
                         </div>
