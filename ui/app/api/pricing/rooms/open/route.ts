@@ -12,6 +12,8 @@ const bodySchema = z.object({
   serviceId: z.string().optional(),
   serviceNumber: z.string().optional(),
   tripId: z.string().optional(),
+  sourceStationId: z.string().optional(),
+  destinationStationId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { routeId, routeDirection, source, destination, journeyDate, title: titleOverride, serviceId, serviceNumber, tripId } = parsed.data;
+    const { routeId, routeDirection, source, destination, journeyDate, title: titleOverride, serviceId, serviceNumber, tripId, sourceStationId, destinationStationId } = parsed.data;
 
     // Format date for display
     const dateDisplay = new Date(journeyDate).toLocaleDateString("en-IN", {
@@ -52,6 +54,8 @@ export async function POST(request: NextRequest) {
           serviceId,
           serviceNumber,
           tripId,
+          sourceStationId,
+          destinationStationId,
         },
       });
     }

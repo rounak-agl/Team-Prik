@@ -32,8 +32,10 @@ import { formatDistanceToNow, format, parseISO } from "date-fns";
 
 interface RoutePair {
   id: string | number;
-  source: { id: string | number; name: string };
-  destination: { id: string | number; name: string };
+  sourceId: string | number;
+  sourceName: string;
+  destinationId: string | number;
+  destinationName: string;
 }
 
 interface Trip {
@@ -135,16 +137,16 @@ export default function PricingRoomsPage() {
   useEffect(() => {
     if (!pairs.length || selectedRoute) return;
     const blrTpt = pairs.find(
-      (p) =>
-        p.source.name.toLowerCase().includes("bangalore") &&
-        p.destination.name.toLowerCase().includes("tirupati")
+      (p: RoutePair) =>
+        p.sourceName.toLowerCase().includes("bangalore") &&
+        p.destinationName.toLowerCase().includes("tirupati")
     );
     const first = blrTpt ?? pairs[0];
     if (first) {
       setSelectedRoute({
-        sourceId: String(first.source.id),
-        destinationId: String(first.destination.id),
-        label: `${first.source.name} → ${first.destination.name}`,
+        sourceId: String(first.sourceId),
+        destinationId: String(first.destinationId),
+        label: `${first.sourceName} → ${first.destinationName}`,
       });
     }
   }, [pairs, selectedRoute]);
@@ -172,6 +174,8 @@ export default function PricingRoomsPage() {
           serviceId: String(trip.serviceid ?? trip.tripid),
           serviceNumber: trip.servicenumber,
           tripId: String(trip.tripid),
+          sourceStationId: selectedRoute.sourceId,
+          destinationStationId: selectedRoute.destinationId,
         }),
       });
       const data = await res.json();
@@ -200,6 +204,8 @@ export default function PricingRoomsPage() {
           destination: destLabel,
           journeyDate: date,
           title: `${sourceLabel} → ${destLabel} (All Services)`,
+          sourceStationId: selectedRoute.sourceId,
+          destinationStationId: selectedRoute.destinationId,
         }),
       });
       const data = await res.json();
@@ -250,17 +256,16 @@ export default function PricingRoomsPage() {
                 <Skeleton className="h-9 w-full bg-slate-800" />
               ) : (
                 <Select
-                  value={selectedRoute ? `${selectedRoute.sourceId}__${selectedRoute.destinationId}` : ""}
+                  value={selectedRoute?.label ?? ""}
                   onValueChange={(val) => {
-                    const [srcId, dstId] = (val ?? "").split("__");
                     const pair = pairs.find(
-                      (p) => String(p.source.id) === srcId && String(p.destination.id) === dstId
+                      (p: RoutePair) => `${p.sourceName} → ${p.destinationName}` === val
                     );
                     if (pair) {
                       setSelectedRoute({
-                        sourceId: srcId,
-                        destinationId: dstId,
-                        label: `${pair.source.name} → ${pair.destination.name}`,
+                        sourceId: String(pair.sourceId),
+                        destinationId: String(pair.destinationId),
+                        label: `${pair.sourceName} → ${pair.destinationName}`,
                       });
                       setQueryParams(null); // reset service list
                     }
@@ -270,15 +275,18 @@ export default function PricingRoomsPage() {
                     <SelectValue placeholder="Select route…" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-64">
-                    {pairs.map((p) => (
-                      <SelectItem
-                        key={`${p.source.id}__${p.destination.id}`}
-                        value={`${p.source.id}__${p.destination.id}`}
-                        className="text-slate-200 focus:bg-slate-800"
-                      >
-                        {p.source.name} → {p.destination.name}
-                      </SelectItem>
-                    ))}
+                    {pairs.map((p: RoutePair) => {
+                      const label = `${p.sourceName} → ${p.destinationName}`;
+                      return (
+                        <SelectItem
+                          key={String(p.id)}
+                          value={label}
+                          className="text-slate-200 focus:bg-slate-800"
+                        >
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
