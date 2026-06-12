@@ -1,6 +1,9 @@
 /**
  * Server-side only — never import from client components.
  */
+import { getIronSession } from "iron-session";
+import { cookies } from "next/headers";
+import { SessionData, sessionOptions } from "@/lib/server/session";
 
 export function getAdminBaseUrl(): string {
   const url = process.env.ADMIN_BASE_URL ?? "https://api-stage.freshbus.com/admin";
@@ -25,47 +28,81 @@ export async function loginToAdminAPI(
     throw new Error(`Admin API login failed: ${res.status}`);
   }
 
-  // Try to extract token from Set-Cookie header first, then JSON body
   const setCookie = res.headers.get("set-cookie") ?? "";
   const cookieMatch = setCookie.match(/access_token=([^;]+)/);
-  if (cookieMatch) {
-    return cookieMatch[1];
-  }
+  if (cookieMatch) return cookieMatch[1];
 
   const data = await res.json();
   const token: string | undefined =
     data?.access_token ?? data?.token ?? data?.data?.access_token ?? data?.data?.token;
 
-  if (!token) {
-    throw new Error("Admin API login response did not contain a token");
+  if (!token) throw new Error("Admin API login response did not contain a token");
+  return token;
+}
+
+/** Re-login with stored credentials to get a fresh token, update the session. */
+async function reloginAndRefreshSession(): Promise<string | null> {
+  try {
+    const email = process.env.PORTAL_USER;
+    const password = process.env.PORTAL_PASS;
+    if (!email || !password) return null;
+
+    const newToken = await loginToAdminAPI(email, password);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+    session.adminToken = newToken;
+    await session.save();
+    return newToken;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch an admin API endpoint, auto-refreshing the token on 401.
+ *  Sends token as Cookie (access_token=...) — the backend requires cookie auth, not Bearer.
+ */
+export async function fetchAdmin(
+  path: string,
+  token: string,
+  options: RequestInit = {}
+): Promise<{ res: Response; token: string }> {
+  const url = `${getAdminBaseUrl()}${path}`;
+
+  const doFetch = (t: string) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+        Cookie: `access_token=${t}`,
+      },
+      cache: "no-store",
+    });
+
+  let res = await doFetch(token);
+
+  if (res.status === 401) {
+    const newToken = await reloginAndRefreshSession();
+    if (newToken) {
+      res = await doFetch(newToken);
+      return { res, token: newToken };
+    }
   }
 
-  return token;
+  return { res, token };
 }
 
 export async function refreshAdminToken(
   currentToken: string
 ): Promise<string | null> {
   try {
-    const baseUrl = getAdminBaseUrl();
-
-    const res = await fetch(`${baseUrl}/auth/refresh-token`, {
+    const res = await fetch(`${getAdminBaseUrl()}/auth/refresh-token`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${currentToken}`,
-      },
+      headers: { Authorization: `Bearer ${currentToken}` },
       cache: "no-store",
     });
-
-    if (!res.ok) {
-      return null;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
-    const token: string | undefined =
-      data?.access_token ?? data?.token ?? data?.data?.access_token ?? data?.data?.token;
-
-    return token ?? null;
+    return data?.access_token ?? data?.token ?? data?.data?.access_token ?? data?.data?.token ?? null;
   } catch {
     return null;
   }
