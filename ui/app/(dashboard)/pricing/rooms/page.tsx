@@ -117,21 +117,13 @@ export default function PricingRoomsPage() {
     label: string;
   } | null>(null);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [queryParams, setQueryParams] = useState<{
-    journeyDate: string;
-    sourceId: string;
-    destinationId: string;
-  } | null>(null);
-  const [openingTripId, setOpeningTripId] = useState<string | null>(null);
   const [openingRouteRoom, setOpeningRouteRoom] = useState(false);
 
   const { data: routePairsData, isLoading: pairsLoading } = useRoutePairs();
   const { data: roomsData, isLoading: roomsLoading } = usePricingRooms();
-  const { data: tripsData, isLoading: tripsLoading, isFetching: tripsFetching } = useTripsByDate(queryParams);
 
   const pairs: RoutePair[] = routePairsData?.pairs ?? [];
   const rooms: PricingRoom[] = roomsData?.rooms ?? [];
-  const trips: Trip[] = tripsData?.trips ?? [];
 
   // Auto-select Bangalore → Tirupati on load
   useEffect(() => {
@@ -150,40 +142,6 @@ export default function PricingRoomsPage() {
       });
     }
   }, [pairs, selectedRoute]);
-
-  async function openServiceRoom(trip: Trip) {
-    if (!selectedRoute) return;
-    const sourceLabel = selectedRoute.label.split(" → ")[0] ?? "SRC";
-    const destLabel = selectedRoute.label.split(" → ")[1] ?? "DST";
-    const tripKey = String(trip.tripid ?? trip.servicenumber);
-    const routeId = `${sourceLabel.toUpperCase().replace(/\s+/g, "_")}-${destLabel.toUpperCase().replace(/\s+/g, "_")}-${trip.servicenumber}`;
-    const routeDirection = `${sourceLabel.toUpperCase().replace(/\s+/g, "_")}_TO_${destLabel.toUpperCase().replace(/\s+/g, "_")}`;
-
-    setOpeningTripId(tripKey);
-    try {
-      const res = await fetch("/api/pricing/rooms/open", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          routeId,
-          routeDirection,
-          source: sourceLabel,
-          destination: destLabel,
-          journeyDate: date,
-          title: `${trip.servicenumber} · ${sourceLabel} → ${destLabel}`,
-          serviceId: String(trip.serviceid ?? trip.tripid),
-          serviceNumber: trip.servicenumber,
-          tripId: String(trip.tripid),
-          sourceStationId: selectedRoute.sourceId,
-          destinationStationId: selectedRoute.destinationId,
-        }),
-      });
-      const data = await res.json();
-      if (data.room?.id) router.push(`/pricing/rooms/${data.room.id}`);
-    } finally {
-      setOpeningTripId(null);
-    }
-  }
 
   async function openRouteRoom() {
     if (!selectedRoute) return;
@@ -241,7 +199,7 @@ export default function PricingRoomsPage() {
       <div>
         <h1 className="text-2xl font-black text-white tracking-tight">Pricing Rooms</h1>
         <p className="text-sm text-slate-400 mt-0.5">
-          Select a route and date to view live services, then open a per-service pricing room.
+          Select a route and date to open a pricing room. Services load inside the room.
         </p>
       </div>
 
@@ -267,7 +225,6 @@ export default function PricingRoomsPage() {
                         destinationId: String(pair.destinationId),
                         label: `${pair.sourceName} → ${pair.destinationName}`,
                       });
-                      setQueryParams(null); // reset service list
                     }
                   }}
                 >
@@ -300,185 +257,29 @@ export default function PricingRoomsPage() {
                 value={date}
                 onChange={(e) => {
                   setDate(e.target.value);
-                  setQueryParams(null);
                 }}
                 className="bg-slate-800 border-slate-700 text-white focus:border-indigo-500"
               />
             </div>
 
-            {/* View Services button */}
+            {/* Open Room button */}
             <Button
-              onClick={() => {
-                if (selectedRoute && date) {
-                  setQueryParams({
-                    journeyDate: date,
-                    sourceId: selectedRoute.sourceId,
-                    destinationId: selectedRoute.destinationId,
-                  });
-                }
-              }}
-              disabled={!selectedRoute || !date}
+              onClick={openRouteRoom}
+              disabled={!selectedRoute || !date || openingRouteRoom}
               className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold mb-0.5"
             >
-              {tripsFetching ? (
+              {openingRouteRoom ? (
                 <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
               ) : (
-                <ChevronRight className="h-4 w-4 mr-1.5" />
+                <MessageSquare className="h-4 w-4 mr-1.5" />
               )}
-              View Services
+              Open Room
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Phase 2: Service List */}
-      {queryParams && (
-        <div className="space-y-3">
-          {/* Section header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm font-semibold text-slate-200">
-                {tripsLoading
-                  ? "Loading services…"
-                  : `${trips.length} service${trips.length !== 1 ? "s" : ""} on ${selectedRoute?.label ?? ""} · ${displayDate}`}
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openRouteRoom}
-              disabled={openingRouteRoom}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white text-xs"
-            >
-              {openingRouteRoom ? (
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              + Route-Level Room
-            </Button>
-          </div>
-
-          {/* Trip cards */}
-          {tripsLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => <TripSkeleton key={i} />)}
-            </div>
-          ) : trips.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center bg-slate-900 border border-slate-800 rounded-xl">
-              <Bus className="h-10 w-10 text-slate-700 mb-3" />
-              <p className="text-slate-400 font-semibold">No services found on this route for the selected date.</p>
-              <p className="text-slate-600 text-sm mt-1">Try a different date or route.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {trips.map((trip) => {
-                const tripKey = String(trip.tripid ?? trip.servicenumber);
-                const isOpening = openingTripId === tripKey;
-                const availPct =
-                  trip.totalseats && trip.availableseats != null
-                    ? trip.availableseats / trip.totalseats
-                    : null;
-
-                return (
-                  <div
-                    key={tripKey}
-                    className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
-                  >
-                    {/* Left: Service info */}
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-black text-slate-100 text-lg leading-none">
-                          {trip.servicenumber}
-                        </span>
-                        {trip.vehicletype && (
-                          <Badge
-                            variant="outline"
-                            className="border-slate-700 text-slate-400 text-[10px] py-0"
-                          >
-                            {trip.vehicletype}
-                          </Badge>
-                        )}
-                      </div>
-                      {trip.routename && (
-                        <p className="text-slate-400 text-sm">{trip.routename}</p>
-                      )}
-
-                      {/* Times */}
-                      <div className="flex items-center gap-2 text-sm text-slate-300">
-                        <span className="font-semibold">{formatTime(trip.boardingtime)}</span>
-                        <ArrowRight className="h-3.5 w-3.5 text-slate-500" />
-                        <span className="font-semibold">{formatTime(trip.droppingtime)}</span>
-                      </div>
-
-                      {/* Seats + fare */}
-                      <div className="flex items-center gap-4 text-sm flex-wrap">
-                        {trip.availableseats != null && trip.totalseats != null && (
-                          <span className={`flex items-center gap-1 font-medium ${seatColor(trip.availableseats, trip.totalseats)}`}>
-                            <Users className="h-3.5 w-3.5" />
-                            {trip.availableseats}/{trip.totalseats} available
-                            {availPct != null && (
-                              <span className="text-slate-500 text-xs">
-                                ({Math.round(availPct * 100)}%)
-                              </span>
-                            )}
-                          </span>
-                        )}
-                        {(trip.minseatfare != null || trip.maxseatfare != null) && (
-                          <span className="text-slate-300">
-                            ₹{trip.minseatfare ?? trip.fare}
-                            {trip.maxseatfare && trip.minseatfare !== trip.maxseatfare
-                              ? ` – ₹${trip.maxseatfare}`
-                              : ""}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Ratings */}
-                      {((trip.redbusrating != null && trip.redbusrating > 0) ||
-                        (trip.abhibusrating != null && trip.abhibusrating > 0)) && (
-                        <div className="flex items-center gap-3 text-xs text-slate-500">
-                          {trip.redbusrating != null && trip.redbusrating > 0 && (
-                            <span className="flex items-center gap-0.5">
-                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {Number(trip.redbusrating).toFixed(1)} Redbus
-                            </span>
-                          )}
-                          {trip.abhibusrating != null && trip.abhibusrating > 0 && (
-                            <span className="flex items-center gap-0.5">
-                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                              {Number(trip.abhibusrating).toFixed(1)} Abhibus
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right: Open Room button */}
-                    <div className="shrink-0">
-                      <Button
-                        onClick={() => openServiceRoom(trip)}
-                        disabled={isOpening}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold w-full sm:w-auto"
-                      >
-                        {isOpening ? (
-                          <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
-                        ) : (
-                          <MessageSquare className="h-4 w-4 mr-1.5" />
-                        )}
-                        Open Pricing Room
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Phase 3: Recent Rooms */}
+      {/* Recent Rooms */}
       <div>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Recent Pricing Rooms</h2>
 
