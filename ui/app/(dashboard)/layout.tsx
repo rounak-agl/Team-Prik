@@ -11,11 +11,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/pricing/login");
   }
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-slate-950">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar user={session.user} />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-6 bg-slate-950">
           {children}
         </main>
       </div>
