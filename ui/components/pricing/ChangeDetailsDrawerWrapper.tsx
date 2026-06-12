@@ -20,7 +20,7 @@ export function ChangeDetailsDrawerWrapper({ roomId, routeTitle, journeyDate }: 
   };
 
   return (
-    <>
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <PricingChatWindow roomId={roomId} onViewChanges={handleViewChanges} />
       <ChangeDetailsDrawer
         batchId={selectedBatchId}
@@ -29,6 +29,6 @@ export function ChangeDetailsDrawerWrapper({ roomId, routeTitle, journeyDate }: 
         routeTitle={routeTitle}
         journeyDate={journeyDate}
       />
-    </>
+    </div>
   );
 }

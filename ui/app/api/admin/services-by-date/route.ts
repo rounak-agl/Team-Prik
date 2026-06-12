@@ -27,12 +27,14 @@ export async function POST(request: Request) {
       }),
     });
 
+    const responseText = await res.text();
+    console.log("[services-by-date] status:", res.status, "body preview:", responseText.slice(0, 300));
+
     if (!res.ok) {
-      console.error("[services-by-date] admin API status:", res.status, await res.text().catch(() => ""));
       return Response.json({ services: [] });
     }
 
-    const data = await res.json();
+    const data = JSON.parse(responseText);
     const raw: any[] = data.data ?? [];
 
     const services = raw.map((svc: any) => {
@@ -50,7 +52,8 @@ export async function POST(request: Request) {
           : null;
 
       return {
-        serviceId: svc.serviceId,
+        serviceId: svc.serviceKey,          // numeric ID
+        serviceNumber: svc.serviceId,        // string like "BN-TP-AC-SE-0601"
         serviceKey: svc.serviceKey,
         routeName: svc.routeName,
         departureTime: svc.primeBoardingTime ?? svc.firstBoardingTime ?? null,

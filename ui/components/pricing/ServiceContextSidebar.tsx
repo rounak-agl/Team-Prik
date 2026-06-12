@@ -26,8 +26,9 @@ interface Props {
 }
 
 interface Service {
-  serviceId: string;
-  serviceKey: number;
+  serviceId: string | number;
+  serviceNumber?: string;
+  serviceKey?: number;
   routeName?: string;
   departureTime?: string;
   totalSeats?: number;
@@ -155,7 +156,7 @@ export function ServiceContextSidebar({ roomId }: Props) {
                   {/* Service ID + time */}
                   <div className="flex items-center justify-between mb-1.5">
                     <span className={cn("text-sm font-bold font-mono", isActive ? "text-indigo-300" : "text-slate-100")}>
-                      {svc.serviceKey ?? svc.serviceId}
+                      {svc.serviceNumber ?? svc.serviceKey ?? svc.serviceId}
                     </span>
                     <div className="flex items-center gap-1 text-slate-400">
                       <Clock className="h-3 w-3" />

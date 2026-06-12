@@ -19,8 +19,9 @@ interface Props {
 }
 
 interface Service {
-  serviceId: string;
-  serviceKey: number;
+  serviceId: string | number;
+  serviceNumber?: string;
+  serviceKey?: number;
   routeName?: string;
   departureTime?: string;
   totalSeats?: number;
@@ -105,8 +106,8 @@ function ServiceCard({
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className={cn("font-bold font-mono text-sm", selected ? "text-indigo-300" : "text-slate-100")}>
-          {svc.serviceKey ?? svc.serviceId}
+        <span className={cn("font-bold font-mono text-xs leading-tight", selected ? "text-indigo-300" : "text-slate-100")}>
+          {svc.serviceNumber ?? svc.serviceKey ?? svc.serviceId}
         </span>
         <div className="flex items-center gap-1 text-slate-400">
           <Clock className="h-3 w-3" />
@@ -196,7 +197,7 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full border-r border-slate-800 bg-slate-950">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden border-r border-slate-800 bg-slate-950">
       {/* Messages or empty state with services */}
       <ScrollArea className="flex-1 px-4">
         <div className="py-4 space-y-3">
@@ -214,7 +215,7 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
 
               {/* Service grid */}
               {servicesLoading ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
                       <Skeleton className="h-4 w-16 bg-slate-800" />
@@ -229,7 +230,7 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
                   <span className="text-xs">No services found for this date.</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   {services.map((svc) => (
                     <ServiceCard
                       key={String(svc.serviceId)}
@@ -271,8 +272,8 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
       {selectedService && (
         <div className="px-4 py-1.5 border-t border-slate-800 flex items-center gap-2">
           <Bus className="h-3 w-3 text-indigo-400 shrink-0" />
-          <span className="text-xs text-indigo-300 font-semibold">
-            Service {selectedService.serviceKey}
+          <span className="text-xs text-indigo-300 font-semibold font-mono">
+            {selectedService.serviceNumber ?? selectedService.serviceKey}
             {selectedService.departureTime && ` · ${selectedService.departureTime.slice(0, 5)}`}
           </span>
           <button
@@ -292,7 +293,7 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
           onKeyDown={handleKeyDown}
           placeholder={
             selectedService
-              ? `Instruction for service ${selectedService.serviceKey}…`
+              ? `Instruction for ${selectedService.serviceNumber ?? selectedService.serviceKey}…`
               : "Add pricing instruction for this route/date..."
           }
           rows={2}
