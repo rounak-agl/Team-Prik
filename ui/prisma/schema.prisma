@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model PricingChatRoom {
+  id             String   @id @default(uuid())
+  routeId        String
+  routeDirection String
+  source         String?
+  destination    String?
+  journeyDate    String   // stored as ISO date string YYYY-MM-DD
+  title          String
+  dayType        String?
+  demandScore    Float?
+  festivalFlag   Boolean  @default(false)
+  status         String   @default("active")
+  serviceId            String?
+  serviceNumber        String?
+  tripId               String?
+  sourceStationId      String?
+  destinationStationId String?
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages      PricingChatMessage[]
+  instructions  PricingInstruction[]
+  changeBatches PricingChangeBatch[]
+
+  @@unique([routeId, routeDirection, journeyDate])
+}
+
+model PricingChatMessage {
+  id          String   @id @default(uuid())
+  roomId      String
+  senderType  String   // ba | agent | system | manager
+  senderId    String?
+  messageText String
+  messageType String   @default("text")
+  metadata    String   @default("{}") // JSON stored as string
+  createdAt   DateTime @default(now())
+
+  room PricingChatRoom @relation(fields: [roomId], references: [id])
+}
+
+model PricingInstruction {
+  id               String    @id @default(uuid())
+  roomId           String
+  scope            String
+  routeId          String?
+  routeDirection   String?
+  journeyDate      String?
+  serviceId        String?
+  serviceNumber    String?
+  timeBand         String?
+  instructionText  String
+  instructionJson  String    // JSON stored as string
+  instructionType  String
+  priority         Int       @default(100)
+  status           String    @default("active")
+  requiresApproval Boolean   @default(false)
+  approvedBy       String?
+  approvedAt       DateTime?
+  effectiveFrom    DateTime  @default(now())
+  expiresAt        DateTime?
+  createdBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  room   PricingChatRoom           @relation(fields: [roomId], references: [id])
+  usages PricingInstructionUsage[]
+}
+
+model PricingInstructionUsage {
+  id            String   @id @default(uuid())
+  instructionId String
+  serviceId     String
+  serviceNumber String?
+  decisionId    String?
+  cycleId       String?
+  usageReason   String?
+  createdAt     DateTime @default(now())
+
+  instruction PricingInstruction @relation(fields: [instructionId], references: [id])
+}
+
+model PricingChangeBatch {
+  id                        String   @id @default(uuid())
+  roomId                    String
+  cycleId                   String?
+  routeId                   String?
+  routeDirection            String?
+  journeyDate               String?
+  changeCount               Int      @default(0)
+  increaseCount             Int      @default(0)
+  decreaseCount             Int      @default(0)
+  classificationChangeCount Int      @default(0)
+  blockedCount              Int      @default(0)
+  failedCount               Int      @default(0)
+  status                    String   @default("applied")
+  summaryText               String?
+  createdBy                 String?
+  createdAt                 DateTime @default(now())
+
+  room  PricingChatRoom     @relation(fields: [roomId], references: [id])
+  items PricingChangeItem[]
+}
+
+model PricingChangeItem {
+  id                   String    @id @default(uuid())
+  batchId              String
+  serviceId            String
+  serviceNumber        String?
+  serviceName          String?
+  departureTime        String?
+  beforeClassification String?
+  afterClassification  String?
+  beforeBusAdjPct      Float?
+  afterBusAdjPct       Float?
+  beforeEffectiveFare  Float?
+  afterEffectiveFare   Float?
+  beforeOccupancy      Float?
+  afterOccupancy       Float?
+  reasonToChange       String
+  instructionUsed      String?
+  instructionId        String?
+  agentConfidence      Float?
+  riskLevel            String?
+  guardrailStatus      String?
+  writerStatus         String?
+  writerResponse       String    @default("{}") // JSON
+  changedBy            String?
+  appliedAt            DateTime?
+  createdAt            DateTime  @default(now())
+
+  batch PricingChangeBatch @relation(fields: [batchId], references: [id])
+}
