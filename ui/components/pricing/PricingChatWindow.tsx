@@ -20,6 +20,7 @@ import type { PricingChatMessage } from "@/lib/schemas";
 
 interface Props {
   roomId: string;
+  onViewChanges?: (batchId: string) => void;
 }
 
 const SUGGESTION_CHIPS = [
@@ -39,7 +40,7 @@ const SCOPE_OPTIONS = [
   { value: "until_departure", label: "Until departure" },
 ];
 
-export function PricingChatWindow({ roomId }: Props) {
+export function PricingChatWindow({ roomId, onViewChanges }: Props) {
   const [text, setText] = useState("");
   const [scope, setScope] = useState("route_date");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -68,7 +69,9 @@ export function PricingChatWindow({ roomId }: Props) {
   };
 
   const handleViewChanges = (batchId: string) => {
-    console.log("View changes for batch:", batchId);
+    if (onViewChanges) {
+      onViewChanges(batchId);
+    }
   };
 
   return (
