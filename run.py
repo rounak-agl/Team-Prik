@@ -69,8 +69,8 @@ def main():
             d = ts.decision
             tag = "ACT" if d.changed else "hold"
             step = {1: "↑", -1: "↓", 0: "="}[d.tier_step]
-            print(f"  [{tag:4}] trip {d.trip_id} ({d.source}): class {d.model_class}{step}{d.new_class}, "
-                  f"adj +{d.adjustment_pct}%  ({d.surge_pct:+.0f}% ₹{d.old_price:.0f}→₹{d.final_price})")
+            print(f"  [{tag:4}] trip {d.trip_id} ({d.source}): now ₹{d.old_price:.0f} → "
+                  f"class {d.model_class}{step}{d.new_class}, adj +{d.adjustment_pct}%")
             print(f"          {d.reason}")
         if len(targets) > 15:
             print(f"  … +{len(targets)-15} more")

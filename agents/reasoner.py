@@ -42,18 +42,24 @@ class ReasonerAgent(Agent):
         by_id = {ts.decision.trip_id: ts for ts in targets}
         items = list(targets)
         judged = 0
+        diag = ""
         for i in range(0, len(items), BATCH):
             batch = items[i:i + BATCH]
             payload = [_features(ts) for ts in batch]
             out = llm.complete("Trips:\n" + json.dumps(payload),
                                system=REASONER_PROMPT, json_mode=True,
-                               max_tokens=40 * len(batch) + 100)
+                               max_tokens=90 * len(batch) + 300)
             if not out:
+                diag = diag or "empty response (see [llm] error if any)"
                 continue
             try:
                 obj = json.loads(out)
                 decisions = obj.get("decisions", obj) if isinstance(obj, dict) else obj
-            except Exception:
+            except Exception as e:
+                diag = diag or f"JSON parse failed ({e}); raw[:200]={out[:200]!r}"
+                continue
+            if not isinstance(decisions, list):
+                diag = diag or f"unexpected shape; raw[:200]={out[:200]!r}"
                 continue
             for item in (decisions or []):
                 try:
@@ -74,4 +80,7 @@ class ReasonerAgent(Agent):
                     judged += 1
                 except Exception:
                     continue
-        bb.log(self.name, f"LLM judged {judged}/{len(targets)} trips (Gemini); Validator will clamp")
+        msg = f"LLM judged {judged}/{len(targets)} trips (Gemini); Validator will clamp"
+        if judged == 0 and diag:
+            msg += f" — DIAG: {diag}"
+        bb.log(self.name, msg)

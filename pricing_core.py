@@ -91,6 +91,7 @@ def _round10(x): return int(round(x/10.0)*10)
 
 def propose(sig: Signals, base_fare: float, current_price: float, model_class: str) -> Decision:
     """Compute the two levers (classification move + adjustment %)."""
+    model_class = (model_class or "").strip() or "Medium"   # null tier in prod → mid default
     factor = STRATEGY_FACTOR[strategy_for(sig)]
     occ, lead = _occ_premium(sig.occupancy_pct), _lead_premium(sig.lead_days)
     dem, vel = _demand_premium(sig.demand_score, sig.is_festival), _velocity_premium(sig.velocity_per_day, sig.seats_total)

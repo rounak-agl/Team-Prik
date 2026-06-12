@@ -48,5 +48,6 @@ def complete(prompt: str, system: str | None = None,
         )
         resp = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
         return (resp.text or "").strip()
-    except Exception:
+    except Exception as e:
+        print(f"[llm] error: {type(e).__name__}: {e}")
         return None

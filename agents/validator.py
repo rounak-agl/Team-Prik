@@ -74,4 +74,4 @@ def _reason(ts, d) -> str:
         if d.components.get("velocity"):  bits.append("selling fast")
         drv = ", ".join(bits) or "no demand pressure"
     cls = f"class {d.model_class}→{d.new_class}" if d.tier_step else f"class {d.new_class} (hold)"
-    return f"{s.day_type} day, {drv} → {cls}, +{d.adjustment_pct}% adj (₹{d.base_fare:.0f}→₹{d.final_price})."
+    return f"{s.day_type} day, {drv} → {cls}, +{d.adjustment_pct}% adj."
