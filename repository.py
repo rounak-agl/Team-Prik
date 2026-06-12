@@ -28,18 +28,19 @@ class MemoryRepo:
             1: dict(route_id=1, min_price=400, max_price=1200, max_surge_pct=60, max_discount_pct=30),
             2: dict(route_id=2, min_price=250, max_price=900,  max_surge_pct=60, max_discount_pct=30),
         }
-        # (id, route, days_out, base, total, booked, recent_frac)
+        # (id, route, days_out, base, total, booked, recent_frac, model_class)
         specs = [
-            (101, 1, 4,  650, 40, 34, 0.0),   # worked example → ₹880
-            (102, 2, 2,  500, 40, 12, 0.3),   # distressed → discount
-            (103, 2, 6,  500, 40, 22, 0.6),   # festival + velocity → surge
-            (104, 1, 20, 650, 40, 6,  0.0),   # far/soft → hold
+            (101, 1, 4,  650, 40, 34, 0.0, "Medium"),   # surge → class↑ + adj
+            (102, 2, 2,  500, 40, 12, 0.3, "Medium"),   # distressed → class↓
+            (103, 2, 6,  500, 40, 22, 0.6, "Low"),      # festival + velocity → surge
+            (104, 1, 20, 650, 40, 6,  0.0, "Medium"),   # far/soft → hold
         ]
         self.trips, self.seats_by_trip, self.bookings_by_trip = {}, {}, {}
         sid = 1
-        for tid, rid, days_out, base, total, booked, recent in specs:
+        for tid, rid, days_out, base, total, booked, recent, model_class in specs:
             self.trips[tid] = dict(id=tid, route_id=rid, departure_date=t + timedelta(days=days_out),
-                                   base_fare=base, status="active")
+                                   base_fare=base, status="active",
+                                   fare_classification=model_class, service_number=str(tid))
             recent_cut = booked * recent
             seats, bks = [], []
             for i in range(total):
@@ -76,3 +77,31 @@ class MemoryRepo:
                                   reason=reason, changed_at=datetime.now()))
 
     def price_history(self):      return self._history
+
+
+# ── backend selection ─────────────────────────────────────────────────────────
+def get_repo(today=None):
+    """PostgresRepo if Postgres is configured (.env), else the seeded MemoryRepo."""
+    import config
+    if config.have_postgres():
+        from db.postgres_repo import PostgresRepo
+        print("[repo] PostgreSQL (live, read-only)")
+        return PostgresRepo(today=today)
+    print("[repo] in-memory seed (set POSTGRES_* in .env for live data)")
+    return MemoryRepo(today=today)
+
+
+def get_ch_store():
+    """ClickHouseStore (with fs_pricing_decisions ready) if configured, else None."""
+    import config
+    if not config.have_clickhouse():
+        return None
+    try:
+        from db.clickhouse_store import ClickHouseStore
+        ch = ClickHouseStore()
+        ch.ensure_decisions_table()
+        print("[ch] ClickHouse decision log ready (fs_pricing_decisions)")
+        return ch
+    except Exception as e:
+        print(f"[ch] ClickHouse unavailable ({e}); decisions won't persist")
+        return None

@@ -33,7 +33,7 @@ def available() -> bool:
 
 
 def complete(prompt: str, system: str | None = None,
-             max_tokens: int = 512) -> str | None:
+             max_tokens: int = 512, json_mode: bool = False) -> str | None:
     """Return model text, or None if the LLM is unavailable / errors."""
     client = _get_client()
     if client is None:
@@ -44,6 +44,7 @@ def complete(prompt: str, system: str | None = None,
             temperature=1.0, top_p=0.95, top_k=64,
             max_output_tokens=max_tokens,
             system_instruction=system,
+            response_mime_type="application/json" if json_mode else None,
         )
         resp = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
         return (resp.text or "").strip()

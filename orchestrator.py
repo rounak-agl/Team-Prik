@@ -1,34 +1,36 @@
 """Orchestrator — the head agent. Owns the cycle, dispatches to specialised
 worker agents in order, and aggregates results on the shared blackboard.
 
-Pipeline:  Collect → Plan → Price (propose) → Validate (enforce bounds)
-           → Explain → Write
+Pipeline:  Collect → Plan → Price (rule baseline) → Reason (LLM judgment)
+           → Validate (clamp/enforce bounds) → Write
 
 Agents never call each other; the orchestrator sequences them and they
-communicate only through the Blackboard. The Validator is the single
-deterministic safety chokepoint, so no LLM agent can produce an out-of-bounds
-fare.
+communicate only through the Blackboard. The LLM (Reasoner) makes the judgment
+call; the Validator is the single deterministic safety chokepoint AFTER it, so
+no LLM decision can produce an out-of-bounds fare.
 """
 from __future__ import annotations
 from datetime import date, datetime
 
 from blackboard import Blackboard
-from agents import (CollectorAgent, PlannerAgent, PricingAgent,
-                    ValidatorAgent, ExplainerAgent, WriterAgent)
+from agents import (CollectorAgent, PlannerAgent, PricingAgent, ReasonerAgent,
+                    ValidatorAgent, WriterAgent)
 
 
 class Orchestrator:
-    def __init__(self, repo, today: date | None = None, apply: bool = True):
+    def __init__(self, repo, today: date | None = None, apply_fares: bool = False,
+                 ch_store=None, admin=None, apply_only=None):
         self.repo = repo
         self.today = today or date.today()
         # ordered pipeline of worker agents
         self.pipeline = [
-            CollectorAgent(repo, today=self.today),
+            CollectorAgent(repo, today=self.today, ch_store=ch_store),
             PlannerAgent(),
-            PricingAgent(),
-            ValidatorAgent(),
-            ExplainerAgent(),            # before Writer so the reason is logged
-            WriterAgent(repo, apply=apply),
+            PricingAgent(),              # deterministic baseline (fallback)
+            ReasonerAgent(),             # LLM judgment (Gemini) — the agentic step
+            ValidatorAgent(),            # clamps both levers — safety chokepoint
+            WriterAgent(repo, ch_store=ch_store, admin=admin,
+                        apply_fares=apply_fares, apply_only=apply_only),
         ]
 
     def run_cycle(self) -> Blackboard:
