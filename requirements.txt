@@ -1,0 +1,4 @@
+psycopg2-binary>=2.9      # PostgreSQL (read-only live state)
+clickhouse-connect>=0.7   # ClickHouse (historical reads + new feature tables)
+python-dotenv>=1.0        # load credentials from .env
+google-genai>=0.3         # Gemini 2.5 Flash (optional explanation layer)
