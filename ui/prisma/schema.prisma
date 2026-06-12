@@ -18,6 +18,9 @@ model PricingChatRoom {
   demandScore    Float?
   festivalFlag   Boolean  @default(false)
   status         String   @default("active")
+  serviceId      String?
+  serviceNumber  String?
+  tripId         String?
   createdBy      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

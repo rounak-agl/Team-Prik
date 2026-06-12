@@ -8,6 +8,10 @@ const bodySchema = z.object({
   source: z.string().optional(),
   destination: z.string().optional(),
   journeyDate: z.string().min(1),
+  title: z.string().optional(),
+  serviceId: z.string().optional(),
+  serviceNumber: z.string().optional(),
+  tripId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -21,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { routeId, routeDirection, source, destination, journeyDate } = parsed.data;
+    const { routeId, routeDirection, source, destination, journeyDate, title: titleOverride, serviceId, serviceNumber, tripId } = parsed.data;
 
     // Format date for display
     const dateDisplay = new Date(journeyDate).toLocaleDateString("en-IN", {
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest) {
       month: "short",
       year: "numeric",
     });
-    const title = `${source || routeId} → ${destination || routeDirection} · ${dateDisplay}`;
+    const title = titleOverride ?? `${source || routeId} → ${destination || routeDirection} · ${dateDisplay}`;
 
     // Upsert: findFirst by unique combo, create if not found
     let room = await prisma.pricingChatRoom.findFirst({
@@ -45,6 +49,9 @@ export async function POST(request: NextRequest) {
           destination,
           journeyDate,
           title,
+          serviceId,
+          serviceNumber,
+          tripId,
         },
       });
     }
