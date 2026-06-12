@@ -41,7 +41,7 @@ export const PricingChatMessageSchema = z.object({
   senderId: z.string().nullable(),
   messageText: z.string(),
   messageType: MessageTypeEnum,
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string(),
 });
 export type PricingChatMessage = z.infer<typeof PricingChatMessageSchema>;
@@ -52,7 +52,7 @@ export const SendMessageRequestSchema = z.object({
   scope: z.string().optional(),
   serviceId: z.string().optional(),
   timeBand: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
 
@@ -87,7 +87,7 @@ export const PricingInstructionSchema = z.object({
   serviceNumber: z.string().nullable(),
   timeBand: z.string().nullable(),
   instructionText: z.string(),
-  instructionJson: z.record(z.unknown()),
+  instructionJson: z.record(z.string(), z.unknown()),
   instructionType: InstructionTypeEnum,
   priority: z.number(),
   status: InstructionStatusEnum,
@@ -115,7 +115,7 @@ export const ParsedInstructionSchema = z.object({
   epkFloor: z.number().optional(),
   aspFloor: z.number().optional(),
   occupancyTarget: z.number().optional(),
-  checkpointRules: z.array(z.record(z.unknown())).optional(),
+  checkpointRules: z.array(z.record(z.string(), z.unknown())).optional(),
   busAdjStepSize: z.number().optional(),
   createdBy: z.string().optional(),
   status: z.string().optional(),
@@ -189,7 +189,7 @@ export const ChangeItemSchema = z.object({
   riskLevel: z.string().nullable(),
   guardrailStatus: z.string().nullable(),
   writerStatus: z.string().nullable(),
-  writerResponse: z.record(z.unknown()).default({}),
+  writerResponse: z.record(z.string(), z.unknown()).default({}),
   changedBy: z.string().nullable(),
   appliedAt: z.string().nullable(),
   createdAt: z.string(),
