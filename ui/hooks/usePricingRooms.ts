@@ -15,6 +15,19 @@ export function usePricingRooms(params?: { date?: string; route?: string }) {
   });
 }
 
+export function useRoom(roomId: string) {
+  return useQuery({
+    queryKey: ["pricing-room", roomId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pricing/rooms/${roomId}`);
+      if (!res.ok) throw new Error("Room not found");
+      return res.json();
+    },
+    enabled: !!roomId,
+    staleTime: 30 * 1000,
+  });
+}
+
 export function useOpenRoom() {
   const qc = useQueryClient();
   return useMutation({

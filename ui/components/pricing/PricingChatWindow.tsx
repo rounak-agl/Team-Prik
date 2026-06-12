@@ -4,7 +4,6 @@ import { useRef, useEffect, useState, KeyboardEvent } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -75,22 +74,7 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full border-r">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-        <div>
-          <div className="font-semibold text-sm">HYD → VJA · 13 Jun 2026</div>
-          <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">
-            <span>Last Run: just now</span>
-            <span>·</span>
-            <span>Next Run: in 5 min</span>
-          </div>
-        </div>
-        <Badge variant="secondary" className="text-xs shrink-0">
-          Recommendation Only
-        </Badge>
-      </div>
-
+    <div className="flex flex-col h-full border-r border-slate-800 bg-slate-950">
       {/* Messages */}
       <ScrollArea className="flex-1 px-4">
         <div className="py-4 space-y-3">
