@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function usePersistedState(key: string, defaultValue: boolean) {
-  const [state, setState] = useState<boolean>(() => {
-    if (typeof window === "undefined") return defaultValue;
+  const [state, setState] = useState<boolean>(defaultValue);
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(key);
-      return stored !== null ? JSON.parse(stored) : defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  });
+      if (stored !== null) setState(JSON.parse(stored));
+    } catch {}
+  }, [key]);
 
   function setValue(value: boolean) {
     setState(value);
