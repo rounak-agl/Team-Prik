@@ -1,5 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+export function useAllInstructions(params?: { status?: string; scope?: string; routeId?: string }) {
+  return useQuery({
+    queryKey: ["all-instructions", params],
+    queryFn: async () => {
+      const search = new URLSearchParams();
+      if (params?.status) search.set("status", params.status);
+      if (params?.scope) search.set("scope", params.scope);
+      if (params?.routeId) search.set("routeId", params.routeId);
+      const res = await fetch(`/api/pricing/instructions?${search}`);
+      if (!res.ok) throw new Error("Failed to fetch instructions");
+      return res.json();
+    },
+  });
+}
+
 export function usePricingInstructions(roomId: string) {
   return useQuery({
     queryKey: ["pricing-instructions", roomId],
