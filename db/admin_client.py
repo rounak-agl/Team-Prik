@@ -11,6 +11,7 @@ via ADMIN_BASE_URL. Reuses the contract of the prior repo's api_client.
 """
 from __future__ import annotations
 import os
+import config  # noqa: F401 — importing runs load_dotenv() so PORTAL_USER/.env are available
 
 BASE_URL = os.environ.get("ADMIN_BASE_URL") or os.environ.get(
     "API_BASE_URL", "https://api-stage.freshbus.com/admin")
@@ -72,6 +73,14 @@ class AdminClient:
         r.raise_for_status()
         return r
 
+    # ── reads (single trip, no route params needed) ──────────────────────────
+    def allowed_classifications(self, trip_id: int) -> list:
+        r = self._send("get", f"/trips/{trip_id}/priceClassifications")
+        return (r.json() or {}).get("fareClassifications", []) or []
+
+    def get_fare_adjustment(self, trip_id: int) -> dict:
+        return self._send("get", f"/trips/{trip_id}/fare_adjustment").json()
+
     # ── lever 1 ───────────────────────────────────────────────────────────────
     def set_classification(self, trip_id: int, fare_classification: str,
                            model: str = DEFAULT_MODEL) -> None:
@@ -82,7 +91,8 @@ class AdminClient:
     # reasonId: 1 = increase in occupancy, 2 = decrease (from the admin API reasons)
     SEAT_TYPES = ["sharedSleeper", "singleSleeper", "seater"]
 
-    def set_fare_adjustment(self, trip_id: int, pct: int, reason_id: int = 1) -> None:
-        pct = max(0, int(pct))
+    def set_fare_adjustment(self, trip_id: int, pct: int, reason_id: int | None = None) -> None:
+        pct = max(-20, min(int(pct), 20))
+        rid = reason_id if reason_id is not None else (1 if pct >= 0 else 2)  # 1=incr,2=decr occ
         self._send("post", f"/trips/fare_adjustment/{pct}",
-                   {"tripIds": [trip_id], "seatType": self.SEAT_TYPES, "reasonId": reason_id})
+                   {"tripIds": [trip_id], "seatType": self.SEAT_TYPES, "reasonId": rid})

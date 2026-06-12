@@ -72,7 +72,7 @@ class ReasonerAgent(Agent):
                         cls = d.new_class
                     d.new_class = cls
                     d.tier_step = tier_index(cls) - tier_index(d.model_class) if tier_index(d.model_class) >= 0 else 0
-                    d.adjustment_pct = max(0, min(int(item.get("adjustment_pct", d.adjustment_pct)), ADJ_CAP))
+                    d.adjustment_pct = max(-ADJ_CAP, min(int(item.get("adjustment_pct", d.adjustment_pct)), ADJ_CAP))
                     r = item.get("reason")
                     if r:
                         d.reason = str(r)[:140]

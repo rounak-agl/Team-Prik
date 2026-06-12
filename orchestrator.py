@@ -36,8 +36,9 @@ class Orchestrator:
     def run_cycle(self) -> Blackboard:
         bb = Blackboard(started_at=datetime.now())
         print(f"\n┌─ Orchestrator cycle @ {bb.started_at:%H:%M:%S} "
-              f"— dispatching {len(self.pipeline)} agents")
+              f"— dispatching {len(self.pipeline)} agents", flush=True)
         for agent in self.pipeline:
+            print(f"   → {agent.name} …", flush=True)
             agent.run(bb)
-        print("└─ cycle complete")
+        print("└─ cycle complete", flush=True)
         return bb

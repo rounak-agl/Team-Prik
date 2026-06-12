@@ -18,4 +18,4 @@ class PricingAgent(Agent):
             d = ts.decision
             step = {1: "↑", -1: "↓", 0: "="}[d.tier_step]
             bb.log(self.name, f"trip {d.trip_id}: class {d.model_class or '?'} {step} {d.new_class}, "
-                              f"adj +{d.adjustment_pct}% ({ts.signals.day_type} day)")
+                              f"adj {d.adjustment_pct:+d}% ({ts.signals.day_type} day)")

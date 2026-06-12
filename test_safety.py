@@ -1,7 +1,7 @@
 """Safety tests for the two-lever output (classification + adjustment %):
-  1. The brief's surge case → tier ↑1 + adjustment capped at +20%.
-  2. Distress → tier ↓1, adjustment 0.
-  3. Across a fuzz: adjustment ∈ [0,20], tier step ∈ {-1,0,+1}, price in bounds.
+  1. Strong surge → tier ↑1 + adjustment capped at +20%.
+  2. Distress → negative adjustment (discount), within ±20%.
+  3. Across a fuzz: adjustment ∈ [-20,20], tier step ∈ {-1,0,+1}, price in bounds.
 """
 from __future__ import annotations
 from signals import Signals
@@ -15,23 +15,24 @@ def _sig(occ, lead, demand, fest=False, vel=0, total=40):
 
 
 def _enforce(d, base, rules):
-    adj = max(0, min(int(d.adjustment_pct), ADJ_CAP))
+    adj = max(-ADJ_CAP, min(int(d.adjustment_pct), ADJ_CAP))
     p = base * (1 + adj / 100)
     p = min(p, base * (1 + rules.max_surge_pct / 100))
+    p = max(p, base * (1 - rules.max_discount_pct / 100))
     p = min(p, rules.max_price); p = max(p, rules.min_price)
     return int(round(p / 10) * 10)
 
 
 def test_surge_steps_tier_and_caps_adjustment():
     d = propose(_sig(85, 4, 72), 650, 650, "Medium")   # net +35% > cap
-    assert d.adjustment_pct == 20, d.adjustment_pct      # capped at +20
-    assert d.tier_step == 1 and d.new_class == "High"    # +1 tier for the rest
+    assert d.adjustment_pct == 20, d.adjustment_pct
+    assert d.tier_step == 1 and d.new_class == "High"
 
 
-def test_distress_steps_tier_down():
+def test_distress_discounts_via_negative_adjustment():
     d = propose(_sig(30, 2, 40), 500, 500, "Medium")
-    assert d.tier_step == -1 and d.new_class == "Low"
-    assert d.adjustment_pct == 0
+    assert d.adjustment_pct < 0, d.adjustment_pct      # discount, not 0
+    assert -ADJ_CAP <= d.adjustment_pct <= 0
 
 
 def test_levers_within_bounds_fuzz():
@@ -41,7 +42,7 @@ def test_levers_within_bounds_fuzz():
             for dem in range(0, 101, 10):
                 for mc in TIERS:
                     d = propose(_sig(occ, lead, dem, fest=(dem > 80)), 650, 650, mc)
-                    assert 0 <= d.adjustment_pct <= ADJ_CAP
+                    assert -ADJ_CAP <= d.adjustment_pct <= ADJ_CAP
                     assert d.tier_step in (-1, 0, 1)
                     assert abs(tier_index(d.new_class) - tier_index(mc)) <= 1
                     final = _enforce(d, 650, rules)

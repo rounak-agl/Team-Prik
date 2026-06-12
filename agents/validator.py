@@ -39,10 +39,11 @@ class ValidatorAgent(Agent):
             rules = PriceRules(float(min_p), float(max_p),
                                float(r["max_surge_pct"]), float(r["max_discount_pct"]))
 
-            adj = max(0, min(int(d.adjustment_pct), ADJ_CAP))
+            adj = max(-ADJ_CAP, min(int(d.adjustment_pct), ADJ_CAP))   # ±cap
             price = base * (1.0 + adj / 100.0)
             was = price
             price = min(price, base * (1 + rules.max_surge_pct / 100.0))
+            price = max(price, base * (1 - rules.max_discount_pct / 100.0))
             price = min(price, rules.max_price)
             price = max(price, rules.min_price)
             price = _round10(price)
@@ -51,8 +52,8 @@ class ValidatorAgent(Agent):
             if price != was:
                 capped += 1
             # reflect any clamp back into the adjustment % we actually apply
-            adj = max(0, round((price / base - 1.0) * 100)) if base else 0
-            d.adjustment_pct = min(adj, ADJ_CAP)
+            adj = round((price / base - 1.0) * 100) if base else 0
+            d.adjustment_pct = max(-ADJ_CAP, min(adj, ADJ_CAP))
             d.final_price = price
             d.surge_pct = round((price - base) / base * 100.0, 1) if base else 0.0
             d.capped = (price != was)
@@ -74,4 +75,4 @@ def _reason(ts, d) -> str:
         if d.components.get("velocity"):  bits.append("selling fast")
         drv = ", ".join(bits) or "no demand pressure"
     cls = f"class {d.model_class}→{d.new_class}" if d.tier_step else f"class {d.new_class} (hold)"
-    return f"{s.day_type} day, {drv} → {cls}, +{d.adjustment_pct}% adj."
+    return f"{s.day_type} day, {drv} → {cls}, {d.adjustment_pct:+d}% adj."
