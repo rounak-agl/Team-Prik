@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { ServiceContextSidebar } from "@/components/pricing/ServiceContextSidebar";
-import { ChangeDetailsDrawerWrapper } from "@/components/pricing/ChangeDetailsDrawerWrapper";
-import { AgentReasoningPanel } from "@/components/pricing/AgentReasoningPanel";
+import { PricingChatWindow } from "@/components/pricing/PricingChatWindow";
+import { ChangeDetailsDrawer } from "@/components/pricing/ChangeDetailsDrawer";
 import { useRoom } from "@/hooks/usePricingRooms";
 import { format, parseISO } from "date-fns";
+import { useState } from "react";
 
 interface Props {
   roomId: string;
@@ -19,18 +19,18 @@ function formatDate(d: string) {
 export function RouteDateRoomLayout({ roomId }: Props) {
   const { data } = useRoom(roomId);
   const room = data?.room;
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
-  const title = room
-    ? room.serviceNumber
-      ? `${room.serviceNumber} · ${room.source ?? ""} → ${room.destination ?? ""}`
-      : `${room.source ?? ""} → ${room.destination ?? ""}`
+  const routeLabel = room
+    ? `${(room.source ?? "").toUpperCase()} → ${(room.destination ?? "").toUpperCase()}`
     : "Loading…";
 
-  const subtitle = room?.journeyDate ? formatDate(room.journeyDate) : "";
+  const dateLabel = room?.journeyDate ? formatDate(room.journeyDate) : "";
 
   return (
     <div className="flex flex-col -m-6" style={{ height: "calc(100vh - 60px)" }}>
-      {/* Room header with back button */}
+      {/* Header */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-slate-800 bg-slate-950 shrink-0">
         <Link
           href="/pricing/rooms"
@@ -40,24 +40,29 @@ export function RouteDateRoomLayout({ roomId }: Props) {
           Rooms
         </Link>
         <span className="text-slate-700 shrink-0">·</span>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-slate-100 truncate">{title}</span>
-          {subtitle && (
-            <span className="text-slate-500 text-sm shrink-0">{subtitle}</span>
-          )}
-        </div>
+        <span className="font-bold text-slate-100 tracking-wide">{routeLabel}</span>
+        {dateLabel && (
+          <span className="text-slate-500 text-sm shrink-0">{dateLabel}</span>
+        )}
       </div>
 
-      {/* 3-column body */}
-      <div className="grid grid-cols-[280px_1fr_320px] flex-1 min-h-0 overflow-hidden">
-        <ServiceContextSidebar roomId={roomId} />
-        <ChangeDetailsDrawerWrapper
+      {/* Full-width chat */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <PricingChatWindow
           roomId={roomId}
-          routeTitle={title}
-          journeyDate={room?.journeyDate}
+          routeLabel={routeLabel}
+          dateLabel={dateLabel}
+          onViewChanges={(batchId) => { setSelectedBatchId(batchId); setDrawerOpen(true); }}
         />
-        <AgentReasoningPanel roomId={roomId} />
       </div>
+
+      <ChangeDetailsDrawer
+        batchId={selectedBatchId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        routeTitle={routeLabel}
+        journeyDate={room?.journeyDate}
+      />
     </div>
   );
 }

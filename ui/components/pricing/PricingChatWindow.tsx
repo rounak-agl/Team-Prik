@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 interface Props {
   roomId: string;
   onViewChanges?: (batchId: string) => void;
+  routeLabel?: string;
+  dateLabel?: string;
 }
 
 interface Service {
@@ -128,7 +130,7 @@ function ServiceCard({
   );
 }
 
-export function PricingChatWindow({ roomId, onViewChanges }: Props) {
+export function PricingChatWindow({ roomId, onViewChanges, routeLabel, dateLabel }: Props) {
   const [text, setText] = useState("");
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -197,7 +199,7 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden border-r border-slate-800 bg-slate-950">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-slate-950">
       {/* Messages or empty state with services */}
       <ScrollArea className="flex-1 px-4">
         <div className="py-4 space-y-3">
@@ -208,39 +210,17 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
               <Skeleton className="h-10 w-2/3" />
             </>
           ) : isEmpty ? (
-            <div className="space-y-4">
-              <p className="text-xs text-slate-500 text-center pt-2">
-                Select a service below to give targeted instructions, or type for the whole route/date.
-              </p>
-
-              {/* Service grid */}
-              {servicesLoading ? (
-                <div className="grid grid-cols-1 gap-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
-                      <Skeleton className="h-4 w-16 bg-slate-800" />
-                      <Skeleton className="h-1.5 w-full bg-slate-800" />
-                      <Skeleton className="h-3 w-24 bg-slate-800" />
-                    </div>
-                  ))}
-                </div>
-              ) : services.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-8 text-slate-600">
-                  <Bus className="h-8 w-8" />
-                  <span className="text-xs">No services found for this date.</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  {services.map((svc) => (
-                    <ServiceCard
-                      key={String(svc.serviceId)}
-                      svc={svc}
-                      selected={selectedService?.serviceId === svc.serviceId}
-                      onClick={() => setSelectedService(selectedService?.serviceId === svc.serviceId ? null : svc)}
-                    />
-                  ))}
-                </div>
-              )}
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-600/30 flex items-center justify-center">
+                <Bus className="h-6 w-6 text-indigo-400" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-slate-300 font-semibold text-sm">No instructions yet</p>
+                <p className="text-slate-500 text-xs max-w-xs">
+                  Start by adding pricing instructions for this route and date.
+                  Example: &ldquo;Treat this date as demand day and do not reduce fares before 6 PM.&rdquo;
+                </p>
+              </div>
             </div>
           ) : (
             messages.map((msg) => (
@@ -294,7 +274,9 @@ export function PricingChatWindow({ roomId, onViewChanges }: Props) {
           placeholder={
             selectedService
               ? `Instruction for ${selectedService.serviceNumber ?? selectedService.serviceKey}…`
-              : "Add pricing instruction for this route/date..."
+              : routeLabel && dateLabel
+                ? `Type pricing instruction for ${routeLabel} on ${dateLabel}…`
+                : "Add pricing instruction for this route/date..."
           }
           rows={2}
           className="resize-none text-sm bg-slate-900 border-slate-700"
