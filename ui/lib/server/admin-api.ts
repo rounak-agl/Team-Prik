@@ -26,7 +26,10 @@ async function adminFetch(
     ...options,
     headers: {
       "Content-Type": "application/json",
+      // Send both forms — the backend accepts either; this avoids the
+      // Bearer-vs-Cookie ambiguity across endpoints.
       Authorization: `Bearer ${token}`,
+      Cookie: `access_token=${token}`,
       ...(options.headers as Record<string, string> | undefined),
     },
     cache: "no-store",

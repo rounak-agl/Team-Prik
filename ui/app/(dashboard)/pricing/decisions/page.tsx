@@ -42,9 +42,31 @@ interface Stats {
   batches: number;
 }
 
+interface AgentDecision {
+  ts: string;
+  trip_id: number;
+  day_type: string;
+  strategy: string;
+  model_class: string;
+  new_class: string;
+  tier_step: number;
+  adjustment_pct: number;
+  surge_pct: number;
+  reason: string;
+}
+
+interface AgentStats {
+  total: number;
+  increases: number;
+  decreases: number;
+  reclassifications: number;
+}
+
 interface ApiData {
   stats: Stats;
   batches: Batch[];
+  agentStats?: AgentStats;
+  agentDecisions?: AgentDecision[];
 }
 
 /* ── Helpers ────────────────────────────────────────────────────── */
@@ -240,6 +262,68 @@ function EmptyState() {
   );
 }
 
+/* ── Live agent decisions (from ClickHouse fs_pricing_decisions) ──── */
+function AdjBadge({ pct }: { pct: number }) {
+  const up = pct > 0, down = pct < 0;
+  const cls = up ? "bg-emerald-900/60 text-emerald-300 border-emerald-700"
+    : down ? "bg-red-900/60 text-red-300 border-red-700"
+    : "bg-slate-800 text-slate-400 border-slate-700";
+  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${cls}`}>{pct > 0 ? `+${pct}` : pct}%</span>;
+}
+
+function LiveAgentDecisions({ decisions, stats }: { decisions: AgentDecision[]; stats?: AgentStats }) {
+  if (!decisions.length) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <h2 className="text-sm font-semibold text-slate-300">Live Agent Decisions</h2>
+        <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
+          from ClickHouse · {stats?.total ?? decisions.length} recent
+        </span>
+        {stats && (
+          <span className="text-[10px] text-slate-400">
+            <span className="text-emerald-400">{stats.increases}↑</span>{" · "}
+            <span className="text-red-400">{stats.decreases}↓</span>{" · "}
+            <span className="text-indigo-300">{stats.reclassifications} reclassified</span>
+          </span>
+        )}
+      </div>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-950/60 text-slate-500 text-[11px] uppercase tracking-wide">
+            <tr>
+              <th className="text-left font-medium px-3 py-2">Time</th>
+              <th className="text-left font-medium px-3 py-2">Trip</th>
+              <th className="text-left font-medium px-3 py-2">Day</th>
+              <th className="text-left font-medium px-3 py-2">Classification</th>
+              <th className="text-left font-medium px-3 py-2">Adj</th>
+              <th className="text-left font-medium px-3 py-2">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decisions.map((d, i) => (
+              <tr key={`${d.trip_id}-${d.ts}-${i}`} className="border-t border-slate-800 hover:bg-slate-800/30">
+                <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{fmtTime(d.ts)}</td>
+                <td className="px-3 py-2 text-slate-300 font-mono text-xs">{d.trip_id}</td>
+                <td className="px-3 py-2 text-slate-400 text-xs">{d.day_type}</td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">
+                  {d.tier_step !== 0 ? (
+                    <span className="text-slate-300">{d.model_class} <span className="text-slate-600">→</span> <span className="text-white font-medium">{d.new_class}</span></span>
+                  ) : (
+                    <span className="text-slate-400">{d.new_class} (hold)</span>
+                  )}
+                </td>
+                <td className="px-3 py-2"><AdjBadge pct={d.adjustment_pct} /></td>
+                <td className="px-3 py-2 text-slate-400 text-xs max-w-md">{d.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Page ───────────────────────────────────────────────────── */
 export default function AgentDecisionsPage() {
   const [data, setData] = useState<ApiData | null>(null);
@@ -272,6 +356,11 @@ export default function AgentDecisionsPage() {
             <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-4 h-[76px] animate-pulse" />
           ))}
         </div>
+      )}
+
+      {/* Live agent decisions (ClickHouse) */}
+      {data && data.agentDecisions && (
+        <LiveAgentDecisions decisions={data.agentDecisions} stats={data.agentStats} />
       )}
 
       {/* Batches */}

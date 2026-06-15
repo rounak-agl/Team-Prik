@@ -118,6 +118,32 @@ class ClickHouseStore:
         return (windowed(ly - timedelta(days=7), ly + timedelta(days=7))
                 or windowed(journey_date - timedelta(days=90), journey_date - timedelta(days=1)))
 
+    # ── BATCHED demand for many services in ONE query (fast; avoids N round-trips) ──
+    def ly_demand_scores(self, service_numbers) -> dict:
+        """{service_number: 0..100} avg daily occupancy over the trailing 60 days,
+        for all given services in a single query. Robust + fast demand proxy."""
+        sns = sorted({s for s in service_numbers if s})
+        if not sns:
+            return {}
+        inlist = ",".join("'" + s.replace("'", "''") + "'" for s in sns)
+        rows = self.query(
+            f"""SELECT Service_Number, round(avg(daily_occ)) AS score FROM (
+                    SELECT Service_Number, Journey_Date,
+                           countIf(Ticket_Status = 'A') * 100.0 / max(total_seats) AS daily_occ
+                    FROM freshbus_operations.bus_ticket_data
+                    WHERE Service_Number IN ({inlist})
+                      AND Journey_Date >= today() - 60 AND Journey_Date < today()
+                    GROUP BY Service_Number, Journey_Date
+                    HAVING max(total_seats) > 0
+                ) GROUP BY Service_Number"""
+        )
+        out: dict = {}
+        for r in rows:
+            sn, sc = r[0], r[1]
+            if sc is not None and sc == sc:        # skip NaN
+                out[sn] = max(0, min(100, int(sc)))
+        return out
+
     # ── example historical read (booking-curve / velocity feature) ────────────
     def booking_velocity_24h(self, service_number: str, journey_date) -> int:
         # bus_ticket_data is seat-grain with Booked_date_time. # VERIFY join key.

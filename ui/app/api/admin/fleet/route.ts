@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pgQuery } from "@/lib/server/postgres";
+import { getAgentDecisionsForTrips } from "@/lib/server/clickhouse";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -213,15 +214,37 @@ LIMIT 500
           : 0,
         currentClassification: row.fareClassification || "NORMAL",
         busAdjPct: 0,
-        agentRecommendation: null,
+        agentRecommendation: null as string | null,
+        agentClassification: null as string | null,
+        agentReason: null as string | null,
         confidence: null,
         risk: "low",
-        lastAgentRun: null,
+        lastAgentRun: null as string | null,
         lastChange: null,
         minFare: row.minFare ? Math.round(Number(row.minFare)) : null,
         maxFare: row.maxFare ? Math.round(Number(row.maxFare)) : null,
       };
     });
+
+    // Enrich with the Python agent's latest decision per trip (ClickHouse bridge).
+    try {
+      const decByTrip = await getAgentDecisionsForTrips(rows.map((r) => Number(r.tripId)));
+      for (const r of rows) {
+        const d = decByTrip[Number(r.tripId)];
+        if (!d) continue;
+        const adj = Number(d.adjustment_pct) || 0;
+        r.busAdjPct = adj;
+        r.agentClassification = d.new_class ?? null;
+        r.agentReason = d.reason ?? null;
+        r.lastAgentRun = d.ts ?? null;
+        r.agentRecommendation =
+          adj > 0 ? "increase"
+          : adj < 0 ? "decrease"
+          : d.new_class && d.new_class !== d.model_class ? "reclassify" : "hold";
+      }
+    } catch (e) {
+      console.warn("[fleet] agent-decision enrichment skipped:", e);
+    }
 
     // Post-query filter for dayType (computed from journeyDate)
     if (dayTypeFilter) {

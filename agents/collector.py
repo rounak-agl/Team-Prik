@@ -1,8 +1,9 @@
 """CollectorAgent — gathers raw state for every active trip into the blackboard.
-Deterministic (no LLM). Reads live state from Postgres (RO); when Postgres has no
-demand_calendar, derives demand_score from last-year same-day occupancy in
-ClickHouse (per the chosen demand source)."""
+Deterministic (no LLM). Reads live state from Postgres (RO); demand is derived
+from historical occupancy in ClickHouse via ONE batched query (fast). Set
+SKIP_LY_DEMAND=1 to bypass the ClickHouse demand lookup entirely."""
 from __future__ import annotations
+import os
 from datetime import date, datetime
 
 from .base import Agent
@@ -19,26 +20,35 @@ class CollectorAgent(Agent):
         self.ch = ch_store
 
     def run(self, bb) -> None:
+        trips = self.repo.active_trips()
+        skip_ly = os.environ.get("SKIP_LY_DEMAND") == "1"
+
+        # ONE batched ClickHouse query for demand across all services (fast).
+        demand_by_service: dict = {}
+        if self.ch is not None and not skip_ly:
+            sns = [t.get("service_number") for t in trips if t.get("service_number")]
+            try:
+                demand_by_service = self.ch.ly_demand_scores(sns)
+            except Exception as e:
+                print(f"[collector] LY demand batch skipped: {e}", flush=True)
+
         ly_used = 0
-        for trip in self.repo.active_trips():
+        for trip in trips:
             tid = trip["id"]
             seats = self.repo.seats(tid)
             bookings = self.repo.bookings(tid)
             dep = trip["departure_date"]
             dep = dep.date() if isinstance(dep, datetime) else dep
             demand = self.repo.demand(trip["route_id"], dep)
-            # derive demand from LY occupancy if not provided and ClickHouse is up
-            if demand is None and self.ch is not None and trip.get("service_number"):
-                try:
-                    score = self.ch.ly_demand_score(trip["service_number"], dep)
-                    if score is not None:
-                        demand = {"demand_score": score, "is_festival": False}
-                        ly_used += 1
-                except Exception:
-                    pass
+            sn = trip.get("service_number")
+            if demand is None and sn in demand_by_service:
+                demand = {"demand_score": demand_by_service[sn], "is_festival": False}
+                ly_used += 1
             rules = self.repo.price_rules(trip["route_id"])
             sig = compute(trip, seats, bookings, demand, today=self.today)
             bb.trips[tid] = TripState(trip=trip, seats=seats, bookings=bookings,
                                       demand=demand, rules=rules, signals=sig)
-        extra = f" (demand from LY for {ly_used})" if ly_used else ""
+
+        extra = (f" (demand from LY for {ly_used})" if ly_used
+                 else " (LY demand skipped)" if skip_ly else "")
         bb.log(self.name, f"collected {len(bb.trips)} active trips{extra}")

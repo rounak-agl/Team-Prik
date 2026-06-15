@@ -473,7 +473,16 @@ export function FleetMonitorPage() {
                       </TableCell>
                       <TableCell>
                         {row.currentClassification ? (
-                          <ClassificationBadge classification={row.currentClassification} />
+                          <span className="inline-flex items-center gap-1">
+                            <ClassificationBadge classification={row.currentClassification} />
+                            {row.agentClassification &&
+                              row.agentClassification !== row.currentClassification && (
+                                <>
+                                  <span className="text-muted-foreground text-xs">→</span>
+                                  <ClassificationBadge classification={row.agentClassification} />
+                                </>
+                              )}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
@@ -485,7 +494,10 @@ export function FleetMonitorPage() {
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs max-w-[160px] truncate">
+                      <TableCell
+                        className="whitespace-nowrap text-xs max-w-[160px] truncate"
+                        title={row.agentReason ?? undefined}
+                      >
                         {row.agentRecommendation ?? (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -577,6 +589,8 @@ interface FleetRow {
   asp?: number;
   epk?: number;
   currentClassification?: string;
+  agentClassification?: string | null;
+  agentReason?: string | null;
   busAdjPct?: number;
   agentRecommendation?: string | null;
   confidence?: number;

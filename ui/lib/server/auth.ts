@@ -58,7 +58,7 @@ async function reloginAndRefreshSession(): Promise<string | null> {
 }
 
 /** Fetch an admin API endpoint, auto-refreshing the token on 401.
- *  Sends token as Cookie (access_token=...) — the backend requires cookie auth, not Bearer.
+ *  Sends the token as both Bearer and Cookie for endpoint compatibility.
  */
 export async function fetchAdmin(
   path: string,
@@ -73,6 +73,9 @@ export async function fetchAdmin(
       headers: {
         "Content-Type": "application/json",
         ...(options.headers ?? {}),
+        // Send both forms — the backend accepts either (Bearer is proven to
+        // work for /trips/*; Cookie for /services/* /stations/*).
+        Authorization: `Bearer ${t}`,
         Cookie: `access_token=${t}`,
       },
       cache: "no-store",
