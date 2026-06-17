@@ -155,6 +155,87 @@ class ClickHouseStore:
                 out[sn] = max(0, min(100, int(sc)))
         return out
 
+    # ── DURABLE feature store: precomputed per-service features ───────────────
+    FEATURE_TABLE = "fs_service_features"
+
+    def ensure_feature_store(self) -> None:
+        """Create the durable per-service feature table (idempotent)."""
+        self.create_feature_table(self.FEATURE_TABLE, f'''
+            CREATE TABLE IF NOT EXISTS {self.FEATURE_TABLE} (
+                service_number   String,
+                final_occ_median Float64,
+                journeys         UInt32,
+                fare_p25         Float64,
+                fare_median      Float64,
+                fare_p75         Float64,
+                occ_fare_corr    Float64,
+                built_at         DateTime DEFAULT now()
+            ) ENGINE = ReplacingMergeTree(built_at) ORDER BY service_number
+        ''')
+
+    def rebuild_service_features(self, days: int = 150) -> int:
+        """The 'nightly' job: aggregate bus_ticket_data into fs_service_features —
+        per-service final-occ median + journey count + fare band + occupancy↔fare
+        correlation (elasticity proxy). ReplacingMergeTree dedups on service_number.
+        Returns the number of services written."""
+        self.ensure_feature_store()
+        self.client.command(f'''
+            INSERT INTO {self.FEATURE_TABLE}
+                (service_number, final_occ_median, journeys, fare_p25, fare_median,
+                 fare_p75, occ_fare_corr)
+            SELECT Service_Number, round(median(occ)), count(),
+                   round(quantile(0.25)(fare)), round(median(fare)),
+                   round(quantile(0.75)(fare)), corr(occ, fare)
+            FROM (
+                SELECT Service_Number, Journey_Date,
+                       countIf(Ticket_Status = 'A') * 100.0 / max(total_seats) AS occ,
+                       avgIf(Seat_fare, Ticket_Status = 'A') AS fare
+                FROM freshbus_operations.bus_ticket_data
+                WHERE Journey_Date >= today() - {int(days)} AND Journey_Date < today()
+                GROUP BY Service_Number, Journey_Date
+                HAVING max(total_seats) > 0 AND fare > 0
+            ) GROUP BY Service_Number
+        ''')
+        self._record_change("REBUILD", f"{self.FEATURE_TABLE} ({days}d window)")
+        rows = self.query(f"SELECT count() FROM {self.FEATURE_TABLE} FINAL")
+        return int(rows[0][0]) if rows else 0
+
+    def _elasticity(self, corr) -> float:
+        """occ↔fare correlation → 0..100 elasticity (high = price-sensitive).
+        Negative corr (occupancy falls as fare rises) ⇒ elastic. NaN ⇒ neutral."""
+        if corr is None or corr != corr:        # NaN guard
+            return 50.0
+        return max(0.0, min(100.0, 50.0 - float(corr) * 50.0))
+
+    def service_features(self, service_numbers) -> dict:
+        """{service_number: {final_occ_median, journeys, elasticity, fare_median}}
+        from the DURABLE store (latest build). {} if the table is empty/absent."""
+        sns = sorted({s for s in service_numbers if s})
+        if not sns:
+            return {}
+        inlist = ",".join("'" + s.replace("'", "''") + "'" for s in sns)
+        rows = self.query(
+            f"""SELECT service_number, final_occ_median, journeys, occ_fare_corr, fare_median
+                FROM {self.FEATURE_TABLE} FINAL WHERE service_number IN ({inlist})""")
+        out: dict = {}
+        for sn, med, jrn, corr, faremed in rows:
+            out[sn] = {"final_occ_median": max(0, min(100, int(med))),
+                       "journeys": int(jrn), "elasticity": self._elasticity(corr),
+                       "fare_median": float(faremed or 0)}
+        return out
+
+    def history_features(self, service_numbers) -> dict:
+        """Prefer the DURABLE store (precomputed, incl. elasticity); fall back to a
+        live bus_ticket_data scan (no elasticity) if the store isn't built yet."""
+        try:
+            r = self.service_features(service_numbers)
+        except Exception:
+            r = {}
+        if r:
+            return r
+        return {sn: {**v, "elasticity": 50.0}
+                for sn, v in self.history_signals(service_numbers).items()}
+
     # ── BATCHED history signals: typical final occupancy + how much history ───
     def history_signals(self, service_numbers, days: int = 150) -> dict:
         """{service_number: {'final_occ_median': 0..100, 'journeys': int}} in ONE

@@ -79,9 +79,10 @@ class _FakeCH:
         self.comp_calls = 0; self.ltb_calls = 0
         self.history_asked = []
         self._jd = date(2026, 6, 20)
-    def history_signals(self, sns):
+    def history_features(self, sns):
         self.history_calls += 1; self.history_asked.append(sorted(sns))
-        return {sn: {"final_occ_median": 80, "journeys": 50} for sn in sns if sn != "NODATA"}
+        return {sn: {"final_occ_median": 80, "journeys": 50, "elasticity": 50.0}
+                for sn in sns if sn != "NODATA"}
     def ly_demand_scores(self, sns):
         self.demand_calls += 1
         return {sn: 60 for sn in sns}

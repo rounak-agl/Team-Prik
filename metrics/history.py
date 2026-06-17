@@ -43,10 +43,13 @@ def trip_extras(current_occ: float, lead_days: int, sig_signals) -> dict:
 
 
 def build_extras(hist: dict | None, occ: float, lead: int) -> dict:
-    """hist = {'final_occ_median': .., 'journeys': ..} for this service, or None."""
+    """hist = {'final_occ_median', 'journeys', ['elasticity']} for this service, or None."""
     if not hist:
         return {}
-    return {
+    out = {
         "history_depth": history_depth(hist.get("journeys", 0)),
         "pace_percentile": pace_percentile(occ, lead, hist.get("final_occ_median", 50)),
     }
+    if hist.get("elasticity") is not None:        # from the DURABLE feature store
+        out["elasticity"] = float(hist["elasticity"])
+    return out

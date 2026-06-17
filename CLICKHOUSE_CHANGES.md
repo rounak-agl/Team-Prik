@@ -55,3 +55,5 @@ DROP TABLE IF EXISTS fs_pricing_decisions;
 
 ## Automatic event log
 <!-- ClickHouseStore appends timestamped DDL events below this line. Do not edit by hand. -->
+- [2026-06-17 17:47:31] CREATE TABLE: freshbus_operations.fs_service_features
+- [2026-06-17 17:47:31] REBUILD: fs_service_features (150d window)

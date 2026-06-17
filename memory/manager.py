@@ -39,10 +39,10 @@ class MemoryManager:
         self._prev_booked: dict = {}              # trip_id -> last seats_booked
         self.db_queries = 0                       # family DB queries actually issued
 
-    # ── LRU-STATIC: history (per service, miss-batched) ──────────────────────
+    # ── LRU-STATIC (DURABLE-backed): history + elasticity (per service) ──────
     def history(self, service_numbers) -> dict:
         return self._per_service(service_numbers, "history",
-                                 lambda miss: self.ch.history_signals(miss))
+                                 lambda miss: self.ch.history_features(miss))
 
     # ── LRU-STATIC: demand (per service, miss-batched) ───────────────────────
     def demand(self, service_numbers) -> dict:

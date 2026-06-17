@@ -91,6 +91,8 @@ def derive_inputs(sig, extras: dict | None = None) -> dict:
         "history_depth": NEUTRAL,             # DURABLE percentiles (not wired) → neutral
         # pricing state (LIVE): discount already offered on unsold seats (DSC-01)
         "discount_depth": float(e.get("discount_depth", 0.0)),
+        # price sensitivity (DURABLE store, ELA): 0..100, high = elastic
+        "elasticity": float(e.get("elasticity", NEUTRAL)),
         # opportunity
         "unsold_fraction": (sig.seats_unsold / sig.seats_total) if sig.seats_total else 0.0,
     }
@@ -122,6 +124,13 @@ def compute(sig, extras: dict | None = None, staleness: float = 0.0) -> dict:
     dd = ip.get("discount_depth", 0.0)
     if price_action < 0 and dd > 0:
         price_action *= max(0.0, 1.0 - (dd / 100.0) * 0.6)
+    # ELA: elastic demand → cuts are effective / raises lose volume; inelastic →
+    # raises are safe / cuts waste margin. Modulate magnitude by ±30%.
+    el = ip.get("elasticity", 50.0)
+    if price_action > 0:          # raising
+        price_action *= max(0.0, 1.0 + (50.0 - el) / 100.0 * 0.3)
+    elif price_action < 0:        # cutting
+        price_action *= max(0.0, 1.0 + (el - 50.0) / 100.0 * 0.3)
     price_action = _clamp(price_action, -100.0, 100.0)
 
     opportunity = _clamp(heat * ip["unsold_fraction"])
@@ -144,4 +153,5 @@ def compute(sig, extras: dict | None = None, staleness: float = 0.0) -> dict:
         "anomaly": anomaly,                             # GRD-09
         "high_interest_no_booking": high_interest_no_booking,  # LTB-08
         "discount_depth": round(ip.get("discount_depth", 0.0), 1),  # DSC-01 (pricing state)
+        "elasticity": round(ip.get("elasticity", NEUTRAL), 1),       # ELA (price sensitivity)
     }

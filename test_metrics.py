@@ -167,6 +167,18 @@ def test_discount_depth_damps_further_cuts():
     assert deep["discount_depth"] == 80
 
 
+def test_elasticity_modulates_price_action():
+    # raising trip: inelastic (el=10) should raise MORE than elastic (el=90)
+    hot = _sig(occ=92, lead=4, demand=90, pace=1.4, vel=18)
+    assert (compute_composites(hot, {"elasticity": 10})["price_action"]
+            > compute_composites(hot, {"elasticity": 90})["price_action"] > 0)
+    # cutting trip: elastic (el=90) should cut DEEPER than inelastic (el=10)
+    cold = _sig(occ=20, lead=1, demand=40, pace=0.6)
+    assert (compute_composites(cold, {"elasticity": 90})["price_action"]
+            < compute_composites(cold, {"elasticity": 10})["price_action"] < 0)
+    assert compute_composites(cold, {"elasticity": 50})["elasticity"] == 50
+
+
 def test_srp_visibility_mapper_and_dormant():
     v = srp_visibility(1)
     assert v["srp_visibility"] == 100.0 and v["srp_first_page"] is True

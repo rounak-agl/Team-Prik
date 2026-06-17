@@ -68,6 +68,8 @@ def main():
                     help="apply on STAGING for ONE trip id only (safest first apply)")
     ap.add_argument("--undo-last", action="store_true",
                     help="revert the most recent logged decision on STAGING (durable undo)")
+    ap.add_argument("--rebuild-features", action="store_true",
+                    help="rebuild the DURABLE feature store (fs_service_features) and exit")
     args = ap.parse_args()
 
     ch = get_ch_store()
@@ -78,6 +80,13 @@ def main():
 
     if args.undo_last:
         _undo_last(ch)
+        return
+    if args.rebuild_features:
+        if ch is None:
+            print("[features] no ClickHouse configured"); return
+        print("[features] rebuilding fs_service_features …")
+        n = ch.rebuild_service_features()
+        print(f"[features] built {n} service rows (booking curve + elasticity)")
         return
     apply_only = {args.apply_one} if args.apply_one is not None else None
     want_apply = args.apply_fares or (args.apply_one is not None)
