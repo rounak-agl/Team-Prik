@@ -7,6 +7,8 @@ The agent must never stall on the LLM — it is off the pricing critical path.
 from __future__ import annotations
 import os
 
+import config  # noqa: F401 — ensures .env is loaded (GEMINI_API_KEY) regardless of import order
+
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 _client = None
 _tried = False

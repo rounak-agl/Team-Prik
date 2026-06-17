@@ -70,6 +70,8 @@ def main():
                     help="revert the most recent logged decision on STAGING (durable undo)")
     ap.add_argument("--rebuild-features", action="store_true",
                     help="rebuild the DURABLE feature store (fs_service_features) and exit")
+    ap.add_argument("--backtest", type=int, nargs="?", const=500, default=None,
+                    metavar="N", help="run the offline revenue backtest over N journeys and exit")
     args = ap.parse_args()
 
     ch = get_ch_store()
@@ -87,6 +89,10 @@ def main():
         print("[features] rebuilding fs_service_features …")
         n = ch.rebuild_service_features()
         print(f"[features] built {n} service rows (booking curve + elasticity)")
+        return
+    if args.backtest is not None:
+        import backtest
+        backtest.main_n(args.backtest)
         return
     apply_only = {args.apply_one} if args.apply_one is not None else None
     want_apply = args.apply_fares or (args.apply_one is not None)
