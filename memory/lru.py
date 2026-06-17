@@ -98,6 +98,16 @@ class LRUCache:
             self._drop(n)
         return len(victims)
 
+    def entries_by_label(self, entity: str, now: float | None = None) -> list:
+        """Live (key, value) pairs for one entity class — used to rebuild a family
+        index from cached cells without re-querying. Skips expired entries."""
+        return [(n.key, n.value) for n in list(self._map.values())
+                if n.label and n.label.entity == entity
+                and not n.label.expired(now) and n.value is not None]
+
+    def size_by_label(self, entity: str) -> int:
+        return sum(1 for n in self._map.values() if n.label and n.label.entity == entity)
+
     def __len__(self) -> int:
         return len(self._map)
 

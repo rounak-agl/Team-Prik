@@ -7,18 +7,20 @@ ClickHouse fs_pricing_decisions (live) or the seed price_history (local).
 """
 from __future__ import annotations
 from .base import Agent
+from memory import FareAction
 
 
 class WriterAgent(Agent):
     name = "Writer"
 
     def __init__(self, repo, ch_store=None, admin=None, apply_fares: bool = False,
-                 apply_only=None):
+                 apply_only=None, mem=None):
         self.repo = repo
         self.ch_store = ch_store
         self.admin = admin                  # AdminClient (staging) or None
         self.apply_fares = apply_fares
         self.apply_only = apply_only        # set of trip_ids to apply, or None = all
+        self.mem = mem                      # MemoryManager: undo STACK
 
     def run(self, bb) -> None:
         applied = logged = 0
@@ -27,6 +29,12 @@ class WriterAgent(Agent):
             if not d.changed:
                 continue
             allowed = self.apply_only is None or d.trip_id in self.apply_only
+            # STACK tier: record the reversible action (pre-state) before applying
+            if self.mem is not None:
+                self.mem.record_action(FareAction(
+                    trip_id=d.trip_id, prev_class=d.model_class,
+                    prev_adjustment_pct=0, new_class=d.new_class,
+                    new_adjustment_pct=d.adjustment_pct))
             # 1) apply BOTH levers on staging — only if explicitly enabled + allowed
             if self.apply_fares and self.admin is not None and allowed:
                 try:

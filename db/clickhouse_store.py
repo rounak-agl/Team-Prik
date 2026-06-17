@@ -87,6 +87,17 @@ class ClickHouseStore:
                           "new_price", "surge_pct", "capped", "reason"],
         )
 
+    def last_decision(self):
+        """Most recent changed decision (trip_id, model_class, new_class, adjustment_pct)
+        for durable undo. Returns None if the log is empty."""
+        rows = self.query(
+            f"""SELECT trip_id, model_class, new_class, adjustment_pct
+                FROM {DECISIONS_TABLE} ORDER BY ts DESC LIMIT 1""")
+        if not rows:
+            return None
+        r = rows[0]
+        return int(r[0]), str(r[1]), str(r[2]), int(r[3])
+
     # ── demand from last-year occupancy (DD-01 style), windowed + fallback ────
     def ly_demand_score(self, service_number: str, journey_date):
         """0..100 demand proxy = avg daily occupancy of this service. Tries a

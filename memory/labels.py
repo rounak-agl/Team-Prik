@@ -32,10 +32,19 @@ DEFAULT_TTL = {
     "competitor": 600,    # LRU-SLOW  5–15m
     "rules": 600,         # LRU-SLOW
     "srp": 600,           # LRU-SLOW
+    "ltb": 300,           # LRU-SLOW  (look-to-book moves fast → 5m)
     "route": 21600,       # LRU-STATIC 6h
-    "history": 21600,     # DURABLE + LRU-STATIC 6–24h
+    "demand": 43200,      # LRU-STATIC 12h (LY occupancy anchor)
+    "history": 21600,     # DURABLE + LRU-STATIC 6h
     "velocity": 86400,    # DEQUE 24h
     "undo": None,         # STACK
+}
+
+# Which physical LRU each entity lives in (matches the MemoryPlan tiers).
+TIER_OF = {
+    "route": Tier.LRU_STATIC, "demand": Tier.LRU_STATIC, "history": Tier.LRU_STATIC,
+    "rules": Tier.LRU_SLOW, "competitor": Tier.LRU_SLOW, "ltb": Tier.LRU_SLOW, "srp": Tier.LRU_SLOW,
+    "velocity": Tier.DEQUE, "undo": Tier.STACK,
 }
 
 

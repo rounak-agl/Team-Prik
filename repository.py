@@ -86,9 +86,9 @@ def is_live() -> bool:
     return config.have_postgres()
 
 
-def get_repo(today=None):
+def get_repo(today=None, mem=None):
     """PostgresRepo if Postgres is configured (.env), else the seeded MemoryRepo,
-    wrapped in the LRU CachedRepo unless CACHE=0."""
+    wrapped in the LRU CachedRepo (sharing `mem`'s tiers) unless CACHE=0."""
     import os
     import config
     if config.have_postgres():
@@ -100,8 +100,8 @@ def get_repo(today=None):
         base = MemoryRepo(today=today)
     if os.environ.get("CACHE", "1") != "0":
         from memory import CachedRepo
-        print("[repo] LRU cache enabled (price_rules, route)")
-        return CachedRepo(base)
+        print("[repo] memory layer enabled (route→STATIC, rules→SLOW)")
+        return CachedRepo(base, mem=mem)
     return base
 
 

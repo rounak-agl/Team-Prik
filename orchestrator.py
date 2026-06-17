@@ -19,18 +19,19 @@ from agents import (CollectorAgent, PlannerAgent, PricingAgent, ReasonerAgent,
 
 class Orchestrator:
     def __init__(self, repo, today: date | None = None, apply_fares: bool = False,
-                 ch_store=None, admin=None, apply_only=None):
+                 ch_store=None, admin=None, apply_only=None, mem=None):
         self.repo = repo
         self.today = today or date.today()
+        self.mem = mem
         # ordered pipeline of worker agents
         self.pipeline = [
-            CollectorAgent(repo, today=self.today, ch_store=ch_store),
+            CollectorAgent(repo, today=self.today, ch_store=ch_store, mem=mem),
             PlannerAgent(),
             PricingAgent(),              # deterministic baseline (fallback)
             ReasonerAgent(),             # LLM judgment (Gemini) — the agentic step
             ValidatorAgent(),            # clamps both levers — safety chokepoint
             WriterAgent(repo, ch_store=ch_store, admin=admin,
-                        apply_fares=apply_fares, apply_only=apply_only),
+                        apply_fares=apply_fares, apply_only=apply_only, mem=mem),
         ]
 
     def run_cycle(self) -> Blackboard:

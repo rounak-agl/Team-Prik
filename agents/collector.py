@@ -17,40 +17,40 @@ from metrics import ltb
 class CollectorAgent(Agent):
     name = "Collector"
 
-    def __init__(self, repo, today: date | None = None, ch_store=None):
+    def __init__(self, repo, today: date | None = None, ch_store=None, mem=None):
         self.repo = repo
         self.today = today or date.today()
         self.ch = ch_store
+        self.mem = mem        # MemoryManager: caches families per tier + velocity deque
 
     def run(self, bb) -> None:
         trips = self.repo.active_trips()
         skip_ly = os.environ.get("SKIP_LY_DEMAND") == "1"
+        sns = [t.get("service_number") for t in trips if t.get("service_number")]
+        sids = [t.get("route_id") for t in trips if t.get("route_id") is not None]
 
-        # ONE batched ClickHouse query each for demand + history across all services.
         demand_by_service: dict = {}
         history_by_service: dict = {}
-        if self.ch is not None and not skip_ly:
-            sns = [t.get("service_number") for t in trips if t.get("service_number")]
-            try:
-                demand_by_service = self.ch.ly_demand_scores(sns)
-            except Exception as e:
-                print(f"[collector] LY demand batch skipped: {e}", flush=True)
-            try:
-                history_by_service = self.ch.history_signals(sns)
-            except Exception as e:
-                print(f"[collector] history batch skipped: {e}", flush=True)
-
-        # ONE batched query for competitor (APSRTC) market stats; matched in-loop.
         comp_index: dict = {}
         ltb_index: dict = {}
-        if self.ch is not None and not skip_ly:
+        if not skip_ly and (self.mem is not None or self.ch is not None):
+            # Through the MemoryManager (tiered cache) when present, else direct CH.
+            src = self.mem
             try:
-                comp_index = comp.build_market_index(self.ch.competitor_market())
+                demand_by_service = (src.demand(sns) if src else self.ch.ly_demand_scores(sns))
+            except Exception as e:
+                print(f"[collector] demand batch skipped: {e}", flush=True)
+            try:
+                history_by_service = (src.history(sns) if src else self.ch.history_signals(sns))
+            except Exception as e:
+                print(f"[collector] history batch skipped: {e}", flush=True)
+            try:
+                comp_index = (src.competitor_index() if src
+                              else comp.build_market_index(self.ch.competitor_market()))
             except Exception as e:
                 print(f"[collector] competitor batch skipped: {e}", flush=True)
             try:
-                sids = [t.get("route_id") for t in trips if t.get("route_id") is not None]
-                ltb_index = self.ch.ltb_signals(sids)
+                ltb_index = (src.ltb_index(sids) if src else self.ch.ltb_signals(sids))
             except Exception as e:
                 print(f"[collector] LTB batch skipped: {e}", flush=True)
 
@@ -58,6 +58,7 @@ class CollectorAgent(Agent):
         hist_used = 0
         comp_used = 0
         ltb_used = 0
+        vel_used = 0
         for trip in trips:
             tid = trip["id"]
             seats = self.repo.seats(tid)
@@ -86,6 +87,13 @@ class CollectorAgent(Agent):
                 if lx:
                     extras.update(lx)
                     ltb_used += 1
+            # DEQUE tier: track booking velocity across cycles → velocity_percentile
+            if self.mem is not None:
+                self.mem.observe_bookings(tid, sig.seats_booked)
+                vp = self.mem.velocity_percentile(tid)
+                if vp is not None:
+                    extras["velocity_percentile"] = vp
+                    vel_used += 1
             bb.trips[tid] = TripState(trip=trip, seats=seats, bookings=bookings,
                                       demand=demand, rules=rules, signals=sig,
                                       extras=extras)
@@ -95,4 +103,5 @@ class CollectorAgent(Agent):
         extra += f", history for {hist_used}" if hist_used else ""
         extra += f", competitor for {comp_used}" if comp_used else ""
         extra += f", LTB for {ltb_used}" if ltb_used else ""
+        extra += f", velocity for {vel_used}" if vel_used else ""
         bb.log(self.name, f"collected {len(bb.trips)} active trips{extra}")
