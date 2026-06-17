@@ -177,6 +177,30 @@ class ClickHouseStore:
                            "journeys": int(jrn)}
         return out
 
+    # ── BATCHED competitor market stats (APSRTC live scrape) ──────────────────
+    def competitor_market(self):
+        """Per (route, journey_date) for all FUTURE journeys: median/min/max fare,
+        #services, sellout fraction — using the LATEST capture per service. ONE
+        query; matched to our trips by metrics.competitor (city-pair + date).
+        Source aprstc_scraping_data is live (verified 2026-06-17). redbus/abhibus
+        scrapes are stale (~2025-07) and intentionally excluded."""
+        return self.query(
+            """SELECT route, journey_date,
+                      round(median(price)) AS med, min(price) AS minp, max(price) AS maxp,
+                      count() AS n_services,
+                      countIf(seats = 0) / count() AS sellout_frac
+               FROM (
+                   SELECT route, journey_date, service_number,
+                          argMax(ticket_price, capture_date)    AS price,
+                          argMax(available_seats, capture_date) AS seats
+                   FROM freshbus_operations.aprstc_scraping_data
+                   WHERE journey_date >= today() AND journey_date <= today() + 30
+                   GROUP BY route, journey_date, service_number
+               )
+               WHERE price > 0
+               GROUP BY route, journey_date"""
+        )
+
     # ── example historical read (booking-curve / velocity feature) ────────────
     def booking_velocity_24h(self, service_number: str, journey_date) -> int:
         # bus_ticket_data is seat-grain with Booked_date_time. # VERIFY join key.

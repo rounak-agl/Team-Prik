@@ -10,6 +10,7 @@ from .base import Agent
 from blackboard import TripState
 from signals import compute
 from metrics.history import build_extras
+from metrics import competitor as comp
 
 
 class CollectorAgent(Agent):
@@ -38,8 +39,17 @@ class CollectorAgent(Agent):
             except Exception as e:
                 print(f"[collector] history batch skipped: {e}", flush=True)
 
+        # ONE batched query for competitor (APSRTC) market stats; matched in-loop.
+        comp_index: dict = {}
+        if self.ch is not None and not skip_ly:
+            try:
+                comp_index = comp.build_market_index(self.ch.competitor_market())
+            except Exception as e:
+                print(f"[collector] competitor batch skipped: {e}", flush=True)
+
         ly_used = 0
         hist_used = 0
+        comp_used = 0
         for trip in trips:
             tid = trip["id"]
             seats = self.repo.seats(tid)
@@ -56,6 +66,12 @@ class CollectorAgent(Agent):
             extras = build_extras(history_by_service.get(sn), sig.occupancy_pct, sig.lead_days)
             if extras:
                 hist_used += 1
+            if comp_index:
+                cx = comp.build_extras(comp.parse_our_pair(trip.get("service_name")),
+                                       dep, trip.get("base_fare"), comp_index)
+                if cx:
+                    extras.update(cx)
+                    comp_used += 1
             bb.trips[tid] = TripState(trip=trip, seats=seats, bookings=bookings,
                                       demand=demand, rules=rules, signals=sig,
                                       extras=extras)
@@ -63,4 +79,5 @@ class CollectorAgent(Agent):
         extra = (f" (demand from LY for {ly_used})" if ly_used
                  else " (LY demand skipped)" if skip_ly else "")
         extra += f", history for {hist_used}" if hist_used else ""
+        extra += f", competitor for {comp_used}" if comp_used else ""
         bb.log(self.name, f"collected {len(bb.trips)} active trips{extra}")

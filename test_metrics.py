@@ -6,6 +6,7 @@ from __future__ import annotations
 from signals import Signals
 from metrics import compute_composites
 from metrics.history import history_depth, pace_percentile, build_extras
+from metrics import competitor as comp
 
 
 def _sig(occ, lead, demand, pace, vel=0, total=40):
@@ -75,6 +76,38 @@ def test_history_extras_override_neutral():
 
 def test_build_extras_empty_when_no_history():
     assert build_extras(None, 50, 5) == {}
+
+
+# ── competitor family ────────────────────────────────────────────────────────
+def test_competitor_pair_parsing_and_aliases():
+    assert comp.parse_our_pair("Guntur To Visakhapatnam 12:00") == ("guntur", "visakhapatnam")
+    assert comp.parse_our_pair("Bangalore to Coimbattore") == ("bangalore", "coimbatore")  # alias
+    assert comp.parse_apsrtc_pair("Tirupathi - Bangalore") == frozenset({"tirupati", "bangalore"})
+    assert comp.parse_our_pair("not a route") is None
+
+
+def test_competitor_fare_gap_banded():
+    assert comp.fare_gap_score(500, 500) == 50          # parity
+    assert comp.fare_gap_score(900, 300) <= 90          # 3x pricier but BANDED (not >>90)
+    assert comp.fare_gap_score(300, 900) >= 10          # cheaper -> low pressure, banded
+    assert comp.fare_gap_score(0, 500) == 50            # missing -> neutral
+
+
+def test_competitor_extras_and_unmatched():
+    import datetime as _dt
+    d = _dt.date(2026, 6, 20)
+    idx = comp.build_market_index([("Tirupati - Bangalore", d, 400, 300, 500, 6, 0.5)])
+    ex = comp.build_extras(("bangalore", "tirupati"), d, 800, idx)   # unordered match
+    assert ex and ex["fare_gap_vs_median"] > 50 and ex["competitor_sellouts"] == 50.0
+    assert comp.build_extras(("bangalore", "chennai"), d, 800, idx) == {}   # route not covered
+
+
+def test_competitor_sellouts_relieve_pressure():
+    sig = _sig(occ=70, lead=4, demand=60, pace=1.0)
+    pricey = {"fare_gap_vs_median": 80, "price_rank": 90, "competitor_sellouts": 0}
+    sold_out = {**pricey, "competitor_sellouts": 100}
+    assert (compute_composites(sig, sold_out)["competitive_pressure"]
+            < compute_composites(sig, pricey)["competitive_pressure"])
 
 
 if __name__ == "__main__":

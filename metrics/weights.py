@@ -18,12 +18,12 @@ WEIGHTS = {
         "visit_momentum": 0.15,
         "demand_score": 0.25,
     },
-    # CMP-02 Competitive Pressure (0..100)
+    # CMP-02 Competitive Pressure (0..100). HIGH = force pushing our price DOWN.
     "competitive_pressure": {
-        "fare_gap_vs_median": 0.40,
-        "price_rank": 0.25,
-        "competitor_sellouts": 0.20,
-        "share_trend": 0.15,
+        "fare_gap_vs_median": 0.45,   # we pricier than market median  -> cut
+        "price_rank": 0.30,           # we rank as the most expensive  -> cut
+        "competitor_sellouts": -0.20, # rivals SOLD OUT -> scarcity -> LESS pressure to cut
+        "share_trend": 0.15,          # losing share -> cut (neutral until wired)
     },
     # CMP-03 Urgency (0..100)
     "urgency": {
