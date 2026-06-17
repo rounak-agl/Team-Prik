@@ -89,6 +89,8 @@ def derive_inputs(sig, extras: dict | None = None) -> dict:
         "data_freshness": float(e.get("data_freshness", 100.0)),
         "signal_agreement": _signal_agreement(occ, sig.pace_ratio, demand),
         "history_depth": NEUTRAL,             # DURABLE percentiles (not wired) → neutral
+        # pricing state (LIVE): discount already offered on unsold seats (DSC-01)
+        "discount_depth": float(e.get("discount_depth", 0.0)),
         # opportunity
         "unsold_fraction": (sig.seats_unsold / sig.seats_total) if sig.seats_total else 0.0,
     }
@@ -115,6 +117,11 @@ def compute(sig, extras: dict | None = None, staleness: float = 0.0) -> dict:
     price_action = (w["heat"] * (heat - 50)
                     + w["pressure"] * (pressure - 50)
                     + direction * w["urgency"] * max(0.0, urgency - 50))
+    # DSC-01: the down-lever is already partly pulled — damp further cuts (not raises)
+    # up to 60% when fully discounted, so we don't pile discount onto discount.
+    dd = ip.get("discount_depth", 0.0)
+    if price_action < 0 and dd > 0:
+        price_action *= max(0.0, 1.0 - (dd / 100.0) * 0.6)
     price_action = _clamp(price_action, -100.0, 100.0)
 
     opportunity = _clamp(heat * ip["unsold_fraction"])
@@ -136,4 +143,5 @@ def compute(sig, extras: dict | None = None, staleness: float = 0.0) -> dict:
         "signal_disagreement": round(disagreement, 1),  # GRD-08
         "anomaly": anomaly,                             # GRD-09
         "high_interest_no_booking": high_interest_no_booking,  # LTB-08
+        "discount_depth": round(ip.get("discount_depth", 0.0), 1),  # DSC-01 (pricing state)
     }

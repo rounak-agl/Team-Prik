@@ -39,7 +39,7 @@ class PostgresRepo:
         rows = self._q(
             '''SELECT id, "serviceId", "journeyDate", "staticBaseFare", "basicCost",
                       "asp", kilometers, "fareClassification", "serviceNumber", "serviceName",
-                      "sourceId", "destinationId"
+                      "sourceId", "destinationId", "srpPosition"
                FROM "Trips"
                WHERE active = TRUE
                  AND "journeyDate" >= %s
@@ -59,6 +59,7 @@ class PostgresRepo:
                 "departure_date": r["journeyDate"], "base_fare": float(base),
                 "kilometers": r.get("kilometers"), "fare_classification": r.get("fareClassification"),
                 "service_number": r.get("serviceNumber"), "service_name": r.get("serviceName"),
+                "srp_position": r.get("srpPosition"),
                 "status": "active",
             })
         return out

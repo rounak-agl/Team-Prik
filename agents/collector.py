@@ -12,6 +12,8 @@ from signals import compute
 from metrics.history import build_extras
 from metrics import competitor as comp
 from metrics import ltb
+from metrics.discount import discount_depth
+from metrics.srp import srp_visibility
 
 
 class CollectorAgent(Agent):
@@ -59,6 +61,8 @@ class CollectorAgent(Agent):
         comp_used = 0
         ltb_used = 0
         vel_used = 0
+        disc_used = 0
+        srp_used = 0
         for trip in trips:
             tid = trip["id"]
             seats = self.repo.seats(tid)
@@ -87,6 +91,15 @@ class CollectorAgent(Agent):
                 if lx:
                     extras.update(lx)
                     ltb_used += 1
+            # LIVE tier (no query): discount depth on unsold seats (DSC-01) + SRP
+            dx = discount_depth(seats)
+            if dx:
+                extras.update(dx)
+                disc_used += 1
+            sx = srp_visibility(trip.get("srp_position"))
+            if sx:
+                extras.update(sx)
+                srp_used += 1
             # DEQUE tier: track booking velocity across cycles → velocity_percentile
             if self.mem is not None:
                 self.mem.observe_bookings(tid, sig.seats_booked)
@@ -104,4 +117,6 @@ class CollectorAgent(Agent):
         extra += f", competitor for {comp_used}" if comp_used else ""
         extra += f", LTB for {ltb_used}" if ltb_used else ""
         extra += f", velocity for {vel_used}" if vel_used else ""
+        extra += f", discount for {disc_used}" if disc_used else ""
+        extra += f", SRP for {srp_used}" if srp_used else ""
         bb.log(self.name, f"collected {len(bb.trips)} active trips{extra}")

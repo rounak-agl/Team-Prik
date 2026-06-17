@@ -8,6 +8,8 @@ from metrics import compute_composites
 from metrics.history import history_depth, pace_percentile, build_extras
 from metrics import competitor as comp
 from metrics import ltb
+from metrics.discount import discount_depth
+from metrics.srp import srp_visibility
 
 
 def _sig(occ, lead, demand, pace, vel=0, total=40):
@@ -136,6 +138,40 @@ def test_ltb_build_extras_lifts_heat_and_empty_passthrough():
         {"looks": 5000, "block": 60, "books": 30}, sig.lead_days, sig.occupancy_pct))
     assert enr["demand_heat"] > base["demand_heat"]      # strong visit_momentum lifts heat
     assert ltb.build_extras(None, 5, 50) == {}
+
+
+# ── discount (DSC-01) + SRP families ─────────────────────────────────────────
+def _seats(n, booked, fare, disc, disc_on_unsold=True):
+    out = []
+    for i in range(n):
+        b = i < booked
+        d = disc if (disc_on_unsold and not b) else 0.0
+        out.append({"is_booked": b, "price": fare, "discount": d})
+    return out
+
+
+def test_discount_depth_from_unsold_seats():
+    # 10 seats, 4 booked; unsold carry ₹120 disc on ₹600 fare → 20%
+    dd = discount_depth(_seats(10, 4, 600, 120))
+    assert dd and abs(dd["discount_depth"] - 20.0) < 0.1
+    assert discount_depth(_seats(10, 10, 600, 120)) == {}     # all booked → no unsold
+    assert discount_depth([{"is_booked": False, "price": 0, "discount": 0}]) == {}
+
+
+def test_discount_depth_damps_further_cuts():
+    sig = _sig(occ=25, lead=1, demand=40, pace=0.6)          # distressed → wants to cut
+    base = compute_composites(sig, None)
+    deep = compute_composites(sig, {"discount_depth": 80})    # already deeply discounted
+    assert base["price_action"] < 0
+    assert deep["price_action"] > base["price_action"]        # cut is dampened toward 0
+    assert deep["discount_depth"] == 80
+
+
+def test_srp_visibility_mapper_and_dormant():
+    v = srp_visibility(1)
+    assert v["srp_visibility"] == 100.0 and v["srp_first_page"] is True
+    assert srp_visibility(6)["srp_first_page"] is False
+    assert srp_visibility(0) == {} and srp_visibility(None) == {}   # unpopulated → dormant
 
 
 if __name__ == "__main__":
