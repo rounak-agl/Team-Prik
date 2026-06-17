@@ -11,6 +11,7 @@ import json
 
 from .base import Agent
 from pricing_core import tier_index, move_tier, ADJ_CAP
+from metrics import compute_composites
 import llm
 from reasoner_prompt import REASONER_PROMPT
 
@@ -19,13 +20,17 @@ BATCH = 40
 
 def _features(ts):
     d, s = ts.decision, ts.signals
-    return {
+    feat = {
         "trip": d.trip_id, "current_class": d.model_class or "Medium",
         "occupancy_pct": s.occupancy_pct, "lead_days": s.lead_days,
         "demand": s.demand_score, "festival": s.is_festival,
-        "pace": s.pace_ratio, "velocity": s.velocity_per_day, "day_type": s.day_type,
+        "pace": s.pace_ratio, "day_type": s.day_type,
         "rule_class": d.new_class, "rule_adjustment_pct": d.adjustment_pct,
     }
+    comp = getattr(ts, "composites", None)
+    if comp:                       # the 10 LLM-context metrics (composites + flags)
+        feat["scores"] = comp
+    return feat
 
 
 class ReasonerAgent(Agent):
@@ -35,12 +40,21 @@ class ReasonerAgent(Agent):
         targets = bb.targets()
         if not targets:
             return
+
+        items = list(targets)
+        # Composite layer (the 10 LLM-context metrics) — always computed: they are
+        # deterministic and also feed logging/UI. + fleet-wide opportunity rank.
+        for ts in items:
+            ts.composites = compute_composites(ts.signals, getattr(ts, "extras", None))
+        for rank, ts in enumerate(
+                sorted(items, key=lambda t: t.composites.get("opportunity", 0.0), reverse=True), 1):
+            ts.composites["opportunity_rank"] = rank
+
         if not llm.available():
-            bb.log(self.name, f"{len(targets)} trips — LLM unavailable, keeping rule baseline")
+            bb.log(self.name, f"{len(targets)} trips — LLM unavailable, keeping rule baseline (composites computed)")
             return
 
         by_id = {ts.decision.trip_id: ts for ts in targets}
-        items = list(targets)
         judged = 0
         diag = ""
         for i in range(0, len(items), BATCH):

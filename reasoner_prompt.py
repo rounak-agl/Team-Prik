@@ -16,7 +16,16 @@ DAY-TYPE POLICY:
 - low (weak demand): build occupancy — step classification down to fill seats; protect a sensible floor; act early, don't wait.
 - pseudo (unclear): react to this trip's pace — raise if occupancy is moving (pace>1.15), cut (tier down) if stuck (pace<0.85), else hold.
 
-SIGNALS you get per trip: current classification, occupancy %, days/lead to departure, demand score (0-100, derived from last-year occupancy), festival flag, booking pace (1.0=on pace), velocity, and a deterministic baseline proposal (rule_class, rule_adjustment_pct) you may refine.
+SIGNALS per trip: current classification, occupancy %, days/lead to departure, demand score (0-100, from last-year occupancy), festival flag, booking pace (1.0=on pace), day_type, and a deterministic baseline (rule_class, rule_adjustment_pct) you may refine.
+
+COMPOSITE SCORES (`scores`, 0-100 unless noted) — pre-computed rollups; weigh these heavily:
+- demand_heat: how hot the trip is. High -> raise.
+- competitive_pressure: market squeeze. High -> cap surges / protect rank.
+- urgency: how badly it needs action now. High -> act this cycle.
+- price_action: SIGNED -100..+100 net recommended direction (+ raise, - discount); larger magnitude -> bigger move.
+- confidence: trust in the inputs. Low -> make a smaller move.
+- opportunity_rank: 1 = highest revenue opportunity in the batch.
+- flags: anomaly (true -> hold, data suspect); high_interest_no_booking (true -> price problem, consider a cut); signal_disagreement high -> smaller move; staleness high -> hold.
 
 RULES OF THUMB: high occupancy + still time → raise. Low occupancy + close to departure → step down to fill. Festival/high demand → pre-emptive raise. On pace → hold. Prefer the smaller move when signals conflict.
 

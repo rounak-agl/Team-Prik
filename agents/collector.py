@@ -9,6 +9,7 @@ from datetime import date, datetime
 from .base import Agent
 from blackboard import TripState
 from signals import compute
+from metrics.history import build_extras
 
 
 class CollectorAgent(Agent):
@@ -23,16 +24,22 @@ class CollectorAgent(Agent):
         trips = self.repo.active_trips()
         skip_ly = os.environ.get("SKIP_LY_DEMAND") == "1"
 
-        # ONE batched ClickHouse query for demand across all services (fast).
+        # ONE batched ClickHouse query each for demand + history across all services.
         demand_by_service: dict = {}
+        history_by_service: dict = {}
         if self.ch is not None and not skip_ly:
             sns = [t.get("service_number") for t in trips if t.get("service_number")]
             try:
                 demand_by_service = self.ch.ly_demand_scores(sns)
             except Exception as e:
                 print(f"[collector] LY demand batch skipped: {e}", flush=True)
+            try:
+                history_by_service = self.ch.history_signals(sns)
+            except Exception as e:
+                print(f"[collector] history batch skipped: {e}", flush=True)
 
         ly_used = 0
+        hist_used = 0
         for trip in trips:
             tid = trip["id"]
             seats = self.repo.seats(tid)
@@ -46,9 +53,14 @@ class CollectorAgent(Agent):
                 ly_used += 1
             rules = self.repo.price_rules(trip["route_id"])
             sig = compute(trip, seats, bookings, demand, today=self.today)
+            extras = build_extras(history_by_service.get(sn), sig.occupancy_pct, sig.lead_days)
+            if extras:
+                hist_used += 1
             bb.trips[tid] = TripState(trip=trip, seats=seats, bookings=bookings,
-                                      demand=demand, rules=rules, signals=sig)
+                                      demand=demand, rules=rules, signals=sig,
+                                      extras=extras)
 
         extra = (f" (demand from LY for {ly_used})" if ly_used
                  else " (LY demand skipped)" if skip_ly else "")
+        extra += f", history for {hist_used}" if hist_used else ""
         bb.log(self.name, f"collected {len(bb.trips)} active trips{extra}")

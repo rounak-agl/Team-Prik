@@ -80,15 +80,29 @@ class MemoryRepo:
 
 
 # ── backend selection ─────────────────────────────────────────────────────────
+def is_live() -> bool:
+    """True when the live Postgres backend is configured (vs the seeded repo)."""
+    import config
+    return config.have_postgres()
+
+
 def get_repo(today=None):
-    """PostgresRepo if Postgres is configured (.env), else the seeded MemoryRepo."""
+    """PostgresRepo if Postgres is configured (.env), else the seeded MemoryRepo,
+    wrapped in the LRU CachedRepo unless CACHE=0."""
+    import os
     import config
     if config.have_postgres():
         from db.postgres_repo import PostgresRepo
         print("[repo] PostgreSQL (live, read-only)")
-        return PostgresRepo(today=today)
-    print("[repo] in-memory seed (set POSTGRES_* in .env for live data)")
-    return MemoryRepo(today=today)
+        base = PostgresRepo(today=today)
+    else:
+        print("[repo] in-memory seed (set POSTGRES_* in .env for live data)")
+        base = MemoryRepo(today=today)
+    if os.environ.get("CACHE", "1") != "0":
+        from memory import CachedRepo
+        print("[repo] LRU cache enabled (price_rules, route)")
+        return CachedRepo(base)
+    return base
 
 
 def get_ch_store():

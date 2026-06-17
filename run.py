@@ -12,7 +12,7 @@ are set. Decisions always log to ClickHouse fs_pricing_decisions.
 from __future__ import annotations
 import argparse, time
 
-from repository import MemoryRepo, get_repo, get_ch_store
+from repository import get_repo, get_ch_store, is_live
 from orchestrator import Orchestrator
 
 
@@ -36,7 +36,7 @@ def main():
 
     repo = get_repo()
     ch = get_ch_store()
-    live = not isinstance(repo, MemoryRepo)
+    live = is_live()
     apply_only = {args.apply_one} if args.apply_one is not None else None
     want_apply = args.apply_fares or (args.apply_one is not None)
     apply_fares = want_apply or (not live)   # seed demo applies to seed; live applies only if asked

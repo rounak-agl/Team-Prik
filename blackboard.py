@@ -18,6 +18,7 @@ class TripState:
     rules: dict | None = None
     signals: object | None = None       # signals.Signals
     decision: object | None = None      # pricing_core.Decision
+    extras: dict = field(default_factory=dict)   # metric overrides (history, etc.)
     is_target: bool = False             # Planner gates this on
     priority: float = 0.0
     written: bool = False

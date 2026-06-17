@@ -144,6 +144,39 @@ class ClickHouseStore:
                 out[sn] = max(0, min(100, int(sc)))
         return out
 
+    # ── BATCHED history signals: typical final occupancy + how much history ───
+    def history_signals(self, service_numbers, days: int = 150) -> dict:
+        """{service_number: {'final_occ_median': 0..100, 'journeys': int}} in ONE
+        query. final_occ_median = the service's typical end-state occupancy over
+        the trailing `days`; journeys = how many past journeys we observed (depth
+        / confidence proxy). Feeds metrics.history -> pace_percentile + history_depth.
+        Verified live 2026-06-17: medians 80-95%, ~150 journeys for daily services."""
+        sns = sorted({s for s in service_numbers if s})
+        if not sns:
+            return {}
+        inlist = ",".join("'" + s.replace("'", "''") + "'" for s in sns)
+        rows = self.query(
+            f"""SELECT Service_Number,
+                       round(median(occ)) AS final_occ_median,
+                       count() AS journeys
+                FROM (
+                    SELECT Service_Number, Journey_Date,
+                           countIf(Ticket_Status = 'A') * 100.0 / max(total_seats) AS occ
+                    FROM freshbus_operations.bus_ticket_data
+                    WHERE Service_Number IN ({inlist})
+                      AND Journey_Date >= today() - {int(days)} AND Journey_Date < today()
+                    GROUP BY Service_Number, Journey_Date
+                    HAVING max(total_seats) > 0
+                ) GROUP BY Service_Number"""
+        )
+        out: dict = {}
+        for r in rows:
+            sn, med, jrn = r[0], r[1], r[2]
+            if med is not None and med == med:        # skip NaN
+                out[sn] = {"final_occ_median": max(0, min(100, int(med))),
+                           "journeys": int(jrn)}
+        return out
+
     # ── example historical read (booking-curve / velocity feature) ────────────
     def booking_velocity_24h(self, service_number: str, journey_date) -> int:
         # bus_ticket_data is seat-grain with Booked_date_time. # VERIFY join key.
