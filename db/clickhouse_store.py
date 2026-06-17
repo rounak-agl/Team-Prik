@@ -201,6 +201,29 @@ class ClickHouseStore:
                GROUP BY route, journey_date"""
         )
 
+    # ── BATCHED look-to-book funnel (live demand) ─────────────────────────────
+    def ltb_signals(self, service_ids, days: int = 14) -> dict:
+        """{(service_id, journey_date): {'looks','block','books'}} for our active
+        window, in ONE query. Source looks_to_books is live (verified 2026-06-17,
+        covers all active service_ids). Feeds metrics.ltb -> visit_momentum + LTB-08."""
+        sids = sorted({int(s) for s in service_ids if s is not None})
+        if not sids:
+            return {}
+        inlist = ",".join(str(s) for s in sids)
+        rows = self.query(
+            f"""SELECT service_id, journey_date,
+                       sum(looks) AS looks, sum(block) AS block, sum(books) AS books
+                FROM freshbus_operations.looks_to_books
+                WHERE service_id IN ({inlist})
+                  AND journey_date >= today() AND journey_date <= today() + {int(days)}
+                GROUP BY service_id, journey_date"""
+        )
+        out: dict = {}
+        for sid, jd, looks, block, books in rows:
+            out[(int(sid), jd)] = {"looks": int(looks or 0),
+                                   "block": int(block or 0), "books": int(books or 0)}
+        return out
+
     # ── example historical read (booking-curve / velocity feature) ────────────
     def booking_velocity_24h(self, service_number: str, journey_date) -> int:
         # bus_ticket_data is seat-grain with Booked_date_time. # VERIFY join key.

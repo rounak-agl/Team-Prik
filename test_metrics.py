@@ -7,6 +7,7 @@ from signals import Signals
 from metrics import compute_composites
 from metrics.history import history_depth, pace_percentile, build_extras
 from metrics import competitor as comp
+from metrics import ltb
 
 
 def _sig(occ, lead, demand, pace, vel=0, total=40):
@@ -108,6 +109,33 @@ def test_competitor_sellouts_relieve_pressure():
     sold_out = {**pricey, "competitor_sellouts": 100}
     assert (compute_composites(sig, sold_out)["competitive_pressure"]
             < compute_composites(sig, pricey)["competitive_pressure"])
+
+
+# ── LTB funnel family (capacity-independent: absolute look volume) ───────────
+def test_ltb_visit_momentum_monotonic():
+    assert ltb.visit_momentum(0) == 0
+    assert ltb.visit_momentum(200) < ltb.visit_momentum(2000)   # more looks -> hotter
+    assert 0 <= ltb.visit_momentum(50000) <= 100
+
+
+def test_ltb_high_interest_no_booking_gated_by_lead():
+    # near departure, heavy looks, ~no bookings, unsold -> flag
+    assert ltb.high_interest_no_booking(looks=2000, books=2, lead_days=1, occupancy_pct=40) is True
+    # same interest far out -> NOT flagged (early browsing is normal)
+    assert ltb.high_interest_no_booking(looks=2000, books=2, lead_days=12, occupancy_pct=40) is False
+    # near departure but already full -> NOT flagged
+    assert ltb.high_interest_no_booking(looks=2000, books=2, lead_days=1, occupancy_pct=90) is False
+    # too few looks to be meaningful -> NOT flagged
+    assert ltb.high_interest_no_booking(looks=50, books=0, lead_days=1, occupancy_pct=40) is False
+
+
+def test_ltb_build_extras_lifts_heat_and_empty_passthrough():
+    sig = _sig(occ=50, lead=5, demand=50, pace=1.0)
+    base = compute_composites(sig, None)
+    enr = compute_composites(sig, ltb.build_extras(
+        {"looks": 5000, "block": 60, "books": 30}, sig.lead_days, sig.occupancy_pct))
+    assert enr["demand_heat"] > base["demand_heat"]      # strong visit_momentum lifts heat
+    assert ltb.build_extras(None, 5, 50) == {}
 
 
 if __name__ == "__main__":

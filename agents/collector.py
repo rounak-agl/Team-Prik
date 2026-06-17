@@ -11,6 +11,7 @@ from blackboard import TripState
 from signals import compute
 from metrics.history import build_extras
 from metrics import competitor as comp
+from metrics import ltb
 
 
 class CollectorAgent(Agent):
@@ -41,15 +42,22 @@ class CollectorAgent(Agent):
 
         # ONE batched query for competitor (APSRTC) market stats; matched in-loop.
         comp_index: dict = {}
+        ltb_index: dict = {}
         if self.ch is not None and not skip_ly:
             try:
                 comp_index = comp.build_market_index(self.ch.competitor_market())
             except Exception as e:
                 print(f"[collector] competitor batch skipped: {e}", flush=True)
+            try:
+                sids = [t.get("route_id") for t in trips if t.get("route_id") is not None]
+                ltb_index = self.ch.ltb_signals(sids)
+            except Exception as e:
+                print(f"[collector] LTB batch skipped: {e}", flush=True)
 
         ly_used = 0
         hist_used = 0
         comp_used = 0
+        ltb_used = 0
         for trip in trips:
             tid = trip["id"]
             seats = self.repo.seats(tid)
@@ -72,6 +80,12 @@ class CollectorAgent(Agent):
                 if cx:
                     extras.update(cx)
                     comp_used += 1
+            if ltb_index:
+                lx = ltb.build_extras(ltb_index.get((trip.get("route_id"), dep)),
+                                      sig.lead_days, sig.occupancy_pct)
+                if lx:
+                    extras.update(lx)
+                    ltb_used += 1
             bb.trips[tid] = TripState(trip=trip, seats=seats, bookings=bookings,
                                       demand=demand, rules=rules, signals=sig,
                                       extras=extras)
@@ -80,4 +94,5 @@ class CollectorAgent(Agent):
                  else " (LY demand skipped)" if skip_ly else "")
         extra += f", history for {hist_used}" if hist_used else ""
         extra += f", competitor for {comp_used}" if comp_used else ""
+        extra += f", LTB for {ltb_used}" if ltb_used else ""
         bb.log(self.name, f"collected {len(bb.trips)} active trips{extra}")
