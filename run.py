@@ -72,6 +72,8 @@ def main():
                     help="rebuild the DURABLE feature store (fs_service_features) and exit")
     ap.add_argument("--backtest", type=int, nargs="?", const=500, default=None,
                     metavar="N", help="run the offline revenue backtest over N journeys and exit")
+    ap.add_argument("--backtest-llm", type=int, nargs="?", const=100, default=None,
+                    metavar="N", help="LIVE TEST: rules vs LLM vs optimizer over N journeys and exit")
     args = ap.parse_args()
 
     ch = get_ch_store()
@@ -93,6 +95,10 @@ def main():
     if args.backtest is not None:
         import backtest
         backtest.main_n(args.backtest)
+        return
+    if args.backtest_llm is not None:
+        import backtest
+        backtest.main_llm(args.backtest_llm)
         return
     apply_only = {args.apply_one} if args.apply_one is not None else None
     want_apply = args.apply_fares or (args.apply_one is not None)

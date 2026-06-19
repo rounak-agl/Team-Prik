@@ -43,17 +43,26 @@ def complete(prompt: str, system: str | None = None,
     client = _get_client()
     if client is None:
         return None
-    try:
-        from google.genai import types
-        cfg = types.GenerateContentConfig(
-            temperature=1.0, top_p=0.95, top_k=64,
-            max_output_tokens=max_tokens,
-            system_instruction=system,
-            response_mime_type="application/json" if json_mode else None,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-        )
-        resp = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
-        return (resp.text or "").strip()
-    except Exception as e:
-        print(f"[llm] error: {type(e).__name__}: {e}")
-        return None
+    import time
+    from google.genai import types
+    cfg = types.GenerateContentConfig(
+        temperature=1.0, top_p=0.95, top_k=64,
+        max_output_tokens=max_tokens,
+        system_instruction=system,
+        response_mime_type="application/json" if json_mode else None,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+    )
+    last = None
+    for attempt in range(3):                       # retry transient 429/503 (Flash "high demand")
+        try:
+            resp = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
+            return (resp.text or "").strip()
+        except Exception as e:
+            last = e
+            msg = str(e)
+            if any(c in msg for c in ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED")) and attempt < 2:
+                time.sleep(2 * (attempt + 1))      # 2s, 4s backoff
+                continue
+            break
+    print(f"[llm] error: {type(last).__name__}: {last}")
+    return None
